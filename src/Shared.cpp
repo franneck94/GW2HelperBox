@@ -7,7 +7,7 @@ namespace Globals
     RTAPI::RealTimeData *RTAPIData = nullptr;
 
     const char *KB_TOGGLE_GW2HB = "KB_TOGGLE_GW2HB";
-    const char *ADDON_NAME = "GW2HB++";
+    const char *ADDON_NAME = "GW2HB";
 
     std::filesystem::path AddonPath = {};
     std::filesystem::path SettingsPath = {};
