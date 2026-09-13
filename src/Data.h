@@ -8,52 +8,7 @@
 #include <utility>
 #include <vector>
 
-struct Price
-{
-    int copper;
-    int silver;
-    int gold;
-};
-
-struct MyOrderEntry
-{
-    int item_id;
-    std::string item_name;
-    int quantity;
-    int my_price;
-    int curr_price;
-};
-
-struct PriceTriplet
-{
-    Price buy;
-    Price sell;
-    Price profit;
-};
-
-using OrderedIntValues = std::vector<std::pair<std::string, int>>;
-using OrderedStringValues = std::vector<std::pair<std::string, std::string>>;
-
-struct Request
-{
-    std::string request_id;
-    std::future<std::string> future;
-
-    Request(Request &&other) noexcept
-        : request_id(std::move(other.request_id)),
-          future(std::move(other.future))
-    {
-    }
-
-    Request(std::string &&request_id, std::future<std::string> &&future) noexcept
-        : request_id(std::move(request_id)),
-          future(std::move(future))
-    {
-    }
-
-    Request(const Request &) = delete;
-    Request() = delete;
-};
+#include "Types.h"
 
 class Data
 {
