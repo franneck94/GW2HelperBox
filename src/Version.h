@@ -1,8 +1,8 @@
 #ifndef VERSION_H
 #define VERSION_H
 
-#define MAJOR 0
-#define MINOR 18
+#define MAJOR 1
+#define MINOR 0
 #define BUILD 0
 #define REVISION 0
 

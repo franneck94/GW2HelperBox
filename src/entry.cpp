@@ -93,7 +93,7 @@ extern "C" __declspec(dllexport) AddonDefinition *GetAddonDef()
 {
     AddonDef.Signature = -1245534;
     AddonDef.APIVersion = NEXUS_API_VERSION;
-    AddonDef.Name = "GW2HB++";
+    AddonDef.Name = "GW2HB";
     AddonDef.Version.Major = MAJOR;
     AddonDef.Version.Minor = MINOR;
     AddonDef.Version.Build = BUILD;

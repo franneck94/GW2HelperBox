@@ -10,6 +10,6 @@ All notable changes to this project will be documented in this file.
 3. Start the game and load the Addon. This will trigger the download of the updated. exe files
 4. Restart the game
 
-## 0.1.0
+## 1.0.0
 
 - Restarted project as GW2HelperBox++
