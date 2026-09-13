@@ -544,6 +544,8 @@ void Render::render_tables_for_commands(const std::set<std::string> &commands, u
         const auto category_it = API::COMMAND_CATEGORY.find(command);
         const auto category = category_it != API::COMMAND_CATEGORY.end() ? category_it->second : API::PriceCategory::Other;
         const auto matches_filter = price_filter == PriceFilter::All ||
+                                    (price_filter == PriceFilter::Gear && category == API::PriceCategory::Gear) ||
+                                    (price_filter == PriceFilter::Craft && category == API::PriceCategory::Craft) ||
                                     (price_filter == PriceFilter::Runes && category == API::PriceCategory::Rune) ||
                                     (price_filter == PriceFilter::Forges && category == API::PriceCategory::Forge) ||
                                     (price_filter == PriceFilter::Sigils && category == API::PriceCategory::Sigil) ||
@@ -567,7 +569,7 @@ void Render::table_child()
     const auto window_width = ImGui::GetWindowContentRegionWidth();
 
     constexpr auto filter_width = 160.0f;
-    const char *filter_labels[] = {"All", "Runes", "Forges", "Sigils", "Relics"};
+    const char *filter_labels[] = {"All", "Gear", "Craft", "Runes", "Forges", "Sigils", "Relics"};
     auto filter_index = static_cast<int>(price_filter);
     ImGui::SetCursorPosX(max(0.0f, (window_width - filter_width) * 0.5f));
     ImGui::SetNextItemWidth(filter_width);
@@ -579,7 +581,7 @@ void Render::table_child()
     ImGui::BeginChild("ScrollableContent", ImVec2(window_width, -1.0), false, ImGuiWindowFlags_AlwaysAutoResize);
 
     auto idx = 0U;
-    render_tables_for_commands(API::OTHER_COMMANDS, idx);
+    render_tables_for_commands(API::CRAFT_COMMANDS, idx);
     render_tables_for_commands(API::GEAR_COMMANDS, idx);
     render_tables_for_commands(API::FORGE_COMMANDS, idx);
     render_tables_for_commands(API::RUNE_COMMANDS, idx);
