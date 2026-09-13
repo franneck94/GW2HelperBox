@@ -34,6 +34,8 @@ private:
     enum class PriceFilter
     {
         All,
+        Gear,
+        Craft,
         Runes,
         Forges,
         Sigils,
