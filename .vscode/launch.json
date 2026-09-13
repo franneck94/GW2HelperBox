@@ -1,0 +1,33 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Attach Debugger",
+            "type": "cppvsdbg",
+            "request": "attach",
+            "program": "D:/GW2/Gw2-64.exe",
+            "processId": "${command:pickProcess}",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${fileDirname}",
+            "environment": []
+        },
+        {
+            "name": "Image to C Array",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/img_to_c_array.py",
+            "args": [
+                "resources/GW2TP_Normal.png",
+                "resources/GW2TP_Hover.png",
+                "--array-name1",
+                "GW2HB_NORMAL",
+                "--array-name2",
+                "GW2HB_HOVER"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "justMyCode": true
+        }
+    ]
+}
