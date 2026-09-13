@@ -44,6 +44,7 @@
 #include "RenderUI.h"
 #include "Settings.h"
 #include "Shared.h"
+#include "Types.h"
 
 using json = nlohmann::json;
 
@@ -730,11 +731,9 @@ void Render::weekly_child()
         for (auto account_index = 0; account_index < static_cast<int>(accounts.size()); ++account_index)
         {
             const auto selected = completions_account_index == account_index;
-            if (ImGui::Selectable(accounts[account_index].first.c_str(), selected) && !selected)
+            if (ImGui::Selectable(accounts[account_index].first.c_str(), selected) && !selected && !weekly_requested)
             {
                 completions_account_index = account_index;
-                weekly_requested = false;
-                weekly_loaded = false;
             }
             if (selected)
                 ImGui::SetItemDefaultFocus();
@@ -744,13 +743,38 @@ void Render::weekly_child()
 
     const auto &selected_key = accounts[completions_account_index].second;
 
+    if (loaded_completions_account_key != selected_key)
+    {
+        loaded_completions_account_key = selected_key;
+        weekly_loaded = false;
+        weekly_error.clear();
+        raid_wings.clear();
+        dungeon_defs.clear();
+        world_bosses.clear();
+        cleared_raid_events.clear();
+        cleared_dungeon_paths.clear();
+        killed_world_bosses.clear();
+
+        const auto cached = Settings::CompletionCaches.find(selected_key);
+        if (cached != Settings::CompletionCaches.end())
+        {
+            raid_wings = cached->second.raid_wings;
+            dungeon_defs = cached->second.dungeon_defs;
+            world_bosses = cached->second.world_bosses;
+            cleared_raid_events = cached->second.cleared_raid_events;
+            cleared_dungeon_paths = cached->second.cleared_dungeon_paths;
+            killed_world_bosses = cached->second.killed_world_bosses;
+            weekly_loaded = true;
+        }
+    }
+
     if (selected_key.empty())
     {
         ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.2f, 1.0f), "Set an API key for this account in the Settings tab to check its completions.");
         return;
     }
 
-    if (!weekly_requested)
+    if (ImGui::Button("Refresh") && !weekly_requested)
     {
         const auto token = std::wstring(selected_key.begin(), selected_key.end());
         raids_def_future = HTTPClient::GetRequestAsync(L"https://api.guildwars2.com/v2/raids?ids=all");
@@ -759,12 +783,12 @@ void Render::weekly_child()
         account_raids_future = HTTPClient::GetRequestAsync(L"https://api.guildwars2.com/v2/account/raids?access_token=" + token);
         account_dungeons_future = HTTPClient::GetRequestAsync(L"https://api.guildwars2.com/v2/account/dungeons?access_token=" + token);
         account_worldbosses_future = HTTPClient::GetRequestAsync(L"https://api.guildwars2.com/v2/account/worldbosses?access_token=" + token);
+        weekly_request_account_key = selected_key;
         weekly_requested = true;
-        weekly_loaded = false;
         weekly_error.clear();
     }
 
-    if (!weekly_loaded && raids_def_future.has_value() && dungeons_def_future.has_value() &&
+    if (weekly_requested && raids_def_future.has_value() && dungeons_def_future.has_value() &&
         worldbosses_def_future.has_value() && account_raids_future.has_value() &&
         account_dungeons_future.has_value() && account_worldbosses_future.has_value())
     {
@@ -776,7 +800,8 @@ void Render::weekly_child()
         {
             try
             {
-                raid_wings.clear();
+                CompletionCache refreshed;
+                std::string refresh_error;
                 for (const auto &raid : json::parse(raids_def_future->get()))
                     for (const auto &wing : raid.value("wings", json::array()))
                     {
@@ -790,49 +815,64 @@ void Render::weekly_child()
                                 raid_wing.events.push_back(RaidEvent{event_id, is_boss});
                         }
                         if (!raid_wing.events.empty())
-                            raid_wings.push_back(std::move(raid_wing));
+                            refreshed.raid_wings.push_back(std::move(raid_wing));
                     }
 
-                dungeon_defs.clear();
                 for (const auto &dungeon : json::parse(dungeons_def_future->get()))
                 {
                     std::vector<std::string> paths;
                     for (const auto &path : dungeon.value("paths", json::array()))
                         paths.push_back(path.value("id", std::string{}));
-                    dungeon_defs.emplace_back(dungeon.value("id", std::string{}), std::move(paths));
+                    refreshed.dungeon_defs.emplace_back(dungeon.value("id", std::string{}), std::move(paths));
                 }
 
-                world_bosses.clear();
                 for (const auto &id : json::parse(worldbosses_def_future->get()))
-                    world_bosses.push_back(id.get<std::string>());
+                    refreshed.world_bosses.push_back(id.get<std::string>());
 
-                cleared_raid_events.clear();
                 const auto acc_raids = json::parse(account_raids_future->get());
                 if (acc_raids.is_array())
                     for (const auto &id : acc_raids)
-                        cleared_raid_events.insert(id.get<std::string>());
+                        refreshed.cleared_raid_events.insert(id.get<std::string>());
                 else if (acc_raids.contains("text"))
-                    weekly_error = acc_raids["text"].get<std::string>();
+                    refresh_error = acc_raids["text"].get<std::string>();
 
-                cleared_dungeon_paths.clear();
                 const auto acc_dungeons = json::parse(account_dungeons_future->get());
                 if (acc_dungeons.is_array())
                     for (const auto &id : acc_dungeons)
-                        cleared_dungeon_paths.insert(id.get<std::string>());
-                else if (acc_dungeons.contains("text") && weekly_error.empty())
-                    weekly_error = acc_dungeons["text"].get<std::string>();
+                        refreshed.cleared_dungeon_paths.insert(id.get<std::string>());
+                else if (acc_dungeons.contains("text") && refresh_error.empty())
+                    refresh_error = acc_dungeons["text"].get<std::string>();
 
-                killed_world_bosses.clear();
                 const auto acc_worldbosses = json::parse(account_worldbosses_future->get());
                 if (acc_worldbosses.is_array())
                     for (const auto &id : acc_worldbosses)
-                        killed_world_bosses.insert(id.get<std::string>());
-                else if (acc_worldbosses.contains("text") && weekly_error.empty())
-                    weekly_error = acc_worldbosses["text"].get<std::string>();
+                        refreshed.killed_world_bosses.insert(id.get<std::string>());
+                else if (acc_worldbosses.contains("text") && refresh_error.empty())
+                    refresh_error = acc_worldbosses["text"].get<std::string>();
+
+                if (refresh_error.empty())
+                {
+                    Settings::CompletionCaches[weekly_request_account_key] = refreshed;
+                    Settings::Save(Globals::SettingsPath);
+
+                    if (selected_key == weekly_request_account_key)
+                    {
+                        raid_wings = std::move(refreshed.raid_wings);
+                        dungeon_defs = std::move(refreshed.dungeon_defs);
+                        world_bosses = std::move(refreshed.world_bosses);
+                        cleared_raid_events = std::move(refreshed.cleared_raid_events);
+                        cleared_dungeon_paths = std::move(refreshed.cleared_dungeon_paths);
+                        killed_world_bosses = std::move(refreshed.killed_world_bosses);
+                        weekly_loaded = true;
+                    }
+                }
+                else if (selected_key == weekly_request_account_key)
+                    weekly_error = std::move(refresh_error);
             }
             catch (const std::exception &e)
             {
-                weekly_error = std::string("Failed to parse response: ") + e.what();
+                if (selected_key == weekly_request_account_key)
+                    weekly_error = std::string("Failed to parse response: ") + e.what();
             }
 
             raids_def_future.reset();
@@ -841,21 +881,18 @@ void Render::weekly_child()
             account_raids_future.reset();
             account_dungeons_future.reset();
             account_worldbosses_future.reset();
-            weekly_loaded = true;
+            weekly_requested = false;
+            weekly_request_account_key.clear();
         }
     }
 
-    if (ImGui::Button("Refresh"))
-    {
-        weekly_requested = false;
-        weekly_loaded = false;
-    }
-
     ImGui::SameLine();
-    if (!weekly_loaded)
+    if (weekly_requested)
         ImGui::TextUnformatted("Loading...");
     else if (!weekly_error.empty())
         ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "%s", weekly_error.c_str());
+    else if (!weekly_loaded)
+        ImGui::TextUnformatted("No saved completion data. Click Refresh to load it.");
 
     if (!weekly_loaded)
         return;
@@ -1133,23 +1170,6 @@ void Render::collections_child()
         const auto finished = Settings::FinishedCollections.count(collection.first) > 0;
         (finished ? done : not_done).push_back(&collection);
     }
-
-    struct NeededRow
-    {
-        std::string name;
-        int buy_order;   // highest buy order (copper)
-        int instant_buy; // lowest sell listing (copper)
-        bool has_price;
-    };
-
-    struct LockedCollection
-    {
-        const decltype(CollectionSkins::COLLECTIONS)::value_type *collection;
-        std::vector<NeededRow> rows;
-        long long total_buy_order = 0;
-        long long total_instant_buy = 0;
-        bool has_any_price = false;
-    };
 
     std::vector<LockedCollection> priced;
     std::vector<LockedCollection> no_price;

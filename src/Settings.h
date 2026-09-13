@@ -1,35 +1,23 @@
 #ifndef SETTINGS_H
 #define SETTINGS_H
 
+#include <map>
 #include <mutex>
 #include <set>
+#include <string>
+#include <utility>
 #include <vector>
-
-#include "nlohmann/json.hpp"
-using json = nlohmann::json;
 
 #include "mumble/Mumble.h"
 #include "nexus/Nexus.h"
 #include "rtapi/RTAPI.hpp"
 
+#include "Types.h"
+
 extern const char *SHOW_WINDOW;
 extern const char *FORGE_VERSION;
 extern const char *BACKEND_VERSION;
 extern const char *CLICKER_VERSION;
-
-struct CustomItem
-{
-    int item_id = 0;
-    std::string name; // user-defined display name shown in the table header instead of the raw item ID
-};
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(CustomItem, item_id, name)
-
-struct SecondaryAccount
-{
-    std::string name;    // user-defined label shown in the Completions account picker
-    std::string api_key; // only used for the Completions tab, never for trading
-};
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(SecondaryAccount, name, api_key)
 
 namespace Settings
 {
@@ -57,6 +45,7 @@ namespace Settings
     extern std::vector<CustomItem> CustomItems;
     extern std::set<std::string> FinishedCollections;
     extern std::vector<SecondaryAccount> SecondaryAPIKeys;
+    extern std::map<std::string, CompletionCache> CompletionCaches;
 }
 
 #endif

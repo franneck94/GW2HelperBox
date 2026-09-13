@@ -9,8 +9,11 @@
 #include <string>
 #include <vector>
 
-#include "Data.h"
 #include "nexus/Nexus.h"
+
+#include "Data.h"
+#include "Settings.h"
+#include "Types.h"
 
 class Render
 {
@@ -28,37 +31,6 @@ public:
     Render(bool &show_window) : show_window(show_window) {}
 
 private:
-    struct OutdatedOrderNotification
-    {
-        int item_id;
-        std::string item_name;
-        int my_price;
-        int curr_price;
-        std::chrono::steady_clock::time_point created_at;
-    };
-
-    struct ItemIconState
-    {
-        std::string identifier;
-        bool icon_url_requested = false;
-        bool image_requested = false;
-        bool texture_load_requested = false;
-        std::optional<std::future<std::string>> icon_info_future;
-        std::optional<std::future<std::string>> image_future;
-    };
-
-    struct RaidEvent
-    {
-        std::string id;
-        bool is_boss;
-    };
-
-    struct RaidWing
-    {
-        std::string id;
-        std::vector<RaidEvent> events;
-    };
-
     enum class PriceFilter
     {
         All,
@@ -131,6 +103,8 @@ private:
     bool weekly_loaded = false;
     std::string weekly_error;
     int completions_account_index = 0; // 0 = main account, 1..N = secondary keys
+    std::string loaded_completions_account_key;
+    std::string weekly_request_account_key;
     std::vector<RaidWing> raid_wings;
     std::vector<std::pair<std::string, std::vector<std::string>>> dungeon_defs; // dungeon id -> path ids
     std::vector<std::string> world_bosses;                                      // all world boss ids
