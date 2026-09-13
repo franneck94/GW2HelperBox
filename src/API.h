@@ -12,15 +12,15 @@ public:
     static const inline std::wstring PRODUCTION_API_URL = L"https://gw2tp-production.up.railway.app/api";
     static const inline std::wstring LOCAL_API_URL = L"http://localhost:8000/api";
 
-    static const inline std::set<std::string> OTHER_COMMANDS = {
+    static const inline std::set<std::string> CRAFT_COMMANDS = {
         "t5_mats_buy",
         "mats_crafting_compare",
-    };
-
-    static const inline std::set<std::string> GEAR_COMMANDS = {
         "krait_shield_craft",
         "krait_trident_craft",
         "krait_focus_craft",
+    };
+
+    static const inline std::set<std::string> GEAR_COMMANDS = {
         "rare_gear",
         "rare_gear_salvage",
         "gear_salvage",
@@ -56,7 +56,7 @@ public:
     static const inline std::set<std::string> COMMANDS = []()
     {
         std::set<std::string> combined;
-        combined.insert(OTHER_COMMANDS.begin(), OTHER_COMMANDS.end());
+        combined.insert(CRAFT_COMMANDS.begin(), CRAFT_COMMANDS.end());
         combined.insert(GEAR_COMMANDS.begin(), GEAR_COMMANDS.end());
         combined.insert(FORGE_COMMANDS.begin(), FORGE_COMMANDS.end());
         combined.insert(RUNE_COMMANDS.begin(), RUNE_COMMANDS.end());
@@ -68,6 +68,8 @@ public:
     enum class PriceCategory
     {
         Other,
+        Craft,
+        Gear,
         Rune,
         Forge,
         Sigil,
@@ -78,10 +80,10 @@ public:
     static const inline std::map<std::string, PriceCategory> COMMAND_CATEGORY = []()
     {
         std::map<std::string, PriceCategory> mapping;
-        for (const auto &command : OTHER_COMMANDS)
-            mapping[command] = PriceCategory::Other;
+        for (const auto &command : CRAFT_COMMANDS)
+            mapping[command] = PriceCategory::Craft;
         for (const auto &command : GEAR_COMMANDS)
-            mapping[command] = PriceCategory::Other;
+            mapping[command] = PriceCategory::Gear;
         for (const auto &command : FORGE_COMMANDS)
             mapping[command] = PriceCategory::Forge;
         for (const auto &command : RUNE_COMMANDS)
