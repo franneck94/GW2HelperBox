@@ -1,0 +1,138 @@
+#pragma once
+
+#include <chrono>
+#include <future>
+#include <optional>
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include "nlohmann/json.hpp"
+
+using json = nlohmann::json;
+
+struct Price
+{
+    int copper;
+    int silver;
+    int gold;
+};
+
+struct MyOrderEntry
+{
+    int item_id;
+    std::string item_name;
+    int quantity;
+    int my_price;
+    int curr_price;
+};
+
+struct PriceTriplet
+{
+    Price buy;
+    Price sell;
+    Price profit;
+};
+
+using OrderedIntValues = std::vector<std::pair<std::string, int>>;
+using OrderedStringValues = std::vector<std::pair<std::string, std::string>>;
+
+struct Request
+{
+    std::string request_id;
+    std::future<std::string> future;
+
+    Request(Request &&other) noexcept
+        : request_id(std::move(other.request_id)),
+          future(std::move(other.future))
+    {
+    }
+
+    Request(std::string &&request_id, std::future<std::string> &&future) noexcept
+        : request_id(std::move(request_id)),
+          future(std::move(future))
+    {
+    }
+
+    Request(const Request &) = delete;
+    Request() = delete;
+};
+
+struct CustomItem
+{
+    int item_id = 0;
+    std::string name; // user-defined display name shown in the table header instead of the raw item ID
+};
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(CustomItem, item_id, name)
+
+struct SecondaryAccount
+{
+    std::string name;    // user-defined label shown in the Completions account picker
+    std::string api_key; // only used for the Completions tab, never for trading
+};
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(SecondaryAccount, name, api_key)
+
+struct RaidEvent
+{
+    std::string id;
+    bool is_boss = false;
+};
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(RaidEvent, id, is_boss)
+
+struct RaidWing
+{
+    std::string id;
+    std::vector<RaidEvent> events;
+};
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(RaidWing, id, events)
+
+struct CompletionCache
+{
+    std::vector<RaidWing> raid_wings;
+    std::vector<std::pair<std::string, std::vector<std::string>>> dungeon_defs;
+    std::vector<std::string> world_bosses;
+    std::set<std::string> cleared_raid_events;
+    std::set<std::string> cleared_dungeon_paths;
+    std::set<std::string> killed_world_bosses;
+};
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(CompletionCache, raid_wings, dungeon_defs, world_bosses,
+                                   cleared_raid_events, cleared_dungeon_paths, killed_world_bosses)
+
+struct OutdatedOrderNotification
+{
+    int item_id;
+    std::string item_name;
+    int my_price;
+    int curr_price;
+    std::chrono::steady_clock::time_point created_at;
+};
+
+struct ItemIconState
+{
+    std::string identifier;
+    bool icon_url_requested = false;
+    bool image_requested = false;
+    bool texture_load_requested = false;
+    std::optional<std::future<std::string>> icon_info_future;
+    std::optional<std::future<std::string>> image_future;
+};
+
+struct NeededRow
+{
+    std::string name;
+    int buy_order;   // highest buy order (copper)
+    int instant_buy; // lowest sell listing (copper)
+    bool has_price;
+};
+
+using CollectionDefinition = std::pair<const std::string, std::vector<std::pair<int, std::string>>>;
+
+struct LockedCollection
+{
+    const CollectionDefinition *collection;
+    std::vector<NeededRow> rows;
+    long long total_buy_order = 0;
+    long long total_instant_buy = 0;
+    bool has_any_price = false;
+};
