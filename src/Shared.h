@@ -21,6 +21,7 @@ namespace Globals
 
     extern std::filesystem::path AddonPath;
     extern std::filesystem::path SettingsPath;
+    extern std::filesystem::path SquadNotesPath;
 
     extern std::vector<uint32_t> CurrentlyPressedKeys;
     extern PROCESS_INFORMATION ForgeProcessInfo;
