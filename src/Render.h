@@ -48,7 +48,6 @@ private:
     void table_child();
     void render_tables_for_commands(const std::set<std::string> &commands, uint32_t &idx);
     void my_orders_child();
-    void material_totals_child();
     void collections_child();
     void delivery_child();
     void calculators_child();
