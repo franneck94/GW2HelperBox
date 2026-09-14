@@ -202,6 +202,48 @@ namespace
         return price;
     }
 
+    std::optional<int> get_api_int_value(const OrderedIntValues &values, const std::string &key)
+    {
+        const auto value = std::find_if(values.begin(), values.end(), [&](const auto &entry)
+                                        { return entry.first == key; });
+        return value == values.end() ? std::nullopt : std::optional<int>{value->second};
+    }
+
+    bool render_price_threshold_input(const char *label, const char *id, int &total_copper)
+    {
+        auto price = copper_to_price(total_copper);
+        ImGui::TextUnformatted(label);
+        ImGui::SameLine();
+        ImGui::PushID(id);
+
+        auto changed = false;
+        ImGui::SetNextItemWidth(58.0f);
+        changed |= ImGui::InputInt("##Gold", &price.gold, 0, 0, ImGuiInputTextFlags_CharsDecimal);
+        ImGui::SameLine();
+        ImGui::TextUnformatted("g");
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(42.0f);
+        changed |= ImGui::InputInt("##Silver", &price.silver, 0, 0, ImGuiInputTextFlags_CharsDecimal);
+        ImGui::SameLine();
+        ImGui::TextUnformatted("s");
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(42.0f);
+        changed |= ImGui::InputInt("##Copper", &price.copper, 0, 0, ImGuiInputTextFlags_CharsDecimal);
+        ImGui::SameLine();
+        ImGui::TextUnformatted("c");
+
+        if (changed)
+        {
+            price.gold = std::clamp(price.gold, 0, 200000);
+            price.silver = std::clamp(price.silver, 0, 99);
+            price.copper = std::clamp(price.copper, 0, 99);
+            total_copper = price.gold * 10000 + price.silver * 100 + price.copper;
+        }
+
+        ImGui::PopID();
+        return changed;
+    }
+
     void render_my_orders_table(const char *table_id, const std::vector<MyOrderEntry> &orders)
     {
         const ImGuiTableFlags flags = ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg;
@@ -1526,6 +1568,7 @@ void Render::watchlist_child()
         if (item_id > 0 && already_tracked == custom_items.end())
         {
             custom_items.push_back(CustomItem{item_id, item_name_input});
+            Settings::WatchlistPriceAlerts.push_back(WatchlistPriceAlert{.item_id = item_id});
             Settings::Save(Globals::SettingsPath);
             data.requested = false;
         }
@@ -1543,10 +1586,40 @@ void Render::watchlist_child()
         return;
     }
 
+    if (data.loaded)
+    {
+        if (ImGui::Button("Refresh Prices##Watchlist"))
+        {
+            data.loaded = false;
+            data.requested = false;
+            data.api_data.clear();
+            data.futures.clear();
+            data.requesting();
+        }
+    }
+    else
+    {
+        ImGui::TextUnformatted("Loading...");
+    }
+
+    ImGui::Spacing();
+
     const auto window_width = ImGui::GetWindowContentRegionWidth();
     const auto large_window = window_width > 450.0F;
     const auto very_large_window = window_width > 750.0F;
-    const auto child_size = ImVec2(window_width * (very_large_window ? 0.33f : (large_window ? 0.5f : 1.0F)), TABLE_HEIGHT_PX);
+    const auto child_size = ImVec2(window_width * (very_large_window ? 0.33f : (large_window ? 0.5f : 1.0F)), TABLE_HEIGHT_PX + 90.0f);
+
+    auto settings_changed = false;
+    for (const auto &custom_item : Settings::CustomItems)
+    {
+        const auto alert = std::find_if(Settings::WatchlistPriceAlerts.begin(), Settings::WatchlistPriceAlerts.end(), [&](const auto &candidate)
+                                        { return candidate.item_id == custom_item.item_id; });
+        if (alert == Settings::WatchlistPriceAlerts.end())
+        {
+            Settings::WatchlistPriceAlerts.push_back(WatchlistPriceAlert{.item_id = custom_item.item_id});
+            settings_changed = true;
+        }
+    }
 
     auto remove_id = -1;
     auto idx = 0U;
@@ -1558,6 +1631,23 @@ void Render::watchlist_child()
 
         if (ImGui::SmallButton(("Remove##" + std::to_string(item_id)).c_str()))
             remove_id = item_id;
+
+        auto &alert = *std::find_if(Settings::WatchlistPriceAlerts.begin(), Settings::WatchlistPriceAlerts.end(), [item_id](const auto &candidate)
+                                    { return candidate.item_id == item_id; });
+        ImGui::SameLine();
+        ImGui::TextDisabled("Price alerts (0 disables)");
+        if (render_price_threshold_input("Buy >=", "BuyAlert", alert.buy_threshold))
+        {
+            alert.buy_crossed = false;
+            watchlist_alerts_evaluated_for_load = false;
+            settings_changed = true;
+        }
+        if (render_price_threshold_input("Sell <=", "SellAlert", alert.sell_threshold))
+        {
+            alert.sell_crossed = false;
+            watchlist_alerts_evaluated_for_load = false;
+            settings_changed = true;
+        }
 
         render_custom_item_table("custom_" + std::to_string(item_id), display_name);
 
@@ -1575,9 +1665,81 @@ void Render::watchlist_child()
         custom_items.erase(std::remove_if(custom_items.begin(), custom_items.end(), [remove_id](const auto &custom_item)
                                           { return custom_item.item_id == remove_id; }),
                            custom_items.end());
+        Settings::WatchlistPriceAlerts.erase(
+            std::remove_if(Settings::WatchlistPriceAlerts.begin(), Settings::WatchlistPriceAlerts.end(), [remove_id](const auto &alert)
+                           { return alert.item_id == remove_id; }),
+            Settings::WatchlistPriceAlerts.end());
+        watchlist_price_alert_notifications.erase(
+            std::remove_if(watchlist_price_alert_notifications.begin(), watchlist_price_alert_notifications.end(), [remove_id](const auto &notification)
+                           { return notification.item_id == remove_id; }),
+            watchlist_price_alert_notifications.end());
+        pending_watchlist_price_alert_notifications.erase(
+            std::remove_if(pending_watchlist_price_alert_notifications.begin(), pending_watchlist_price_alert_notifications.end(), [remove_id](const auto &notification)
+                           { return notification.item_id == remove_id; }),
+            pending_watchlist_price_alert_notifications.end());
         data.api_data.erase("custom_" + std::to_string(remove_id));
-        Settings::Save(Globals::SettingsPath);
+        settings_changed = true;
     }
+
+    if (settings_changed)
+        Settings::Save(Globals::SettingsPath);
+}
+
+void Render::update_watchlist_price_alerts()
+{
+    if (!data.loaded)
+    {
+        watchlist_alerts_evaluated_for_load = false;
+        return;
+    }
+
+    if (watchlist_alerts_evaluated_for_load)
+        return;
+
+    watchlist_alerts_evaluated_for_load = true;
+    const auto now = std::chrono::steady_clock::now();
+    auto settings_changed = false;
+
+    for (auto &alert : Settings::WatchlistPriceAlerts)
+    {
+        const auto custom_item = std::find_if(Settings::CustomItems.begin(), Settings::CustomItems.end(), [&](const auto &item)
+                                              { return item.item_id == alert.item_id; });
+        const auto prices = data.api_data.find("custom_" + std::to_string(alert.item_id));
+        if (custom_item == Settings::CustomItems.end() || prices == data.api_data.end())
+            continue;
+
+        const auto item_name = custom_item->name.empty() ? "Item #" + std::to_string(alert.item_id) : custom_item->name;
+        const auto evaluate = [&](const std::optional<int> current_price, const int threshold, bool &was_crossed, const bool is_buy_alert)
+        {
+            if (!current_price.has_value() || *current_price <= 0)
+                return;
+
+            const auto crossed = threshold > 0 && (is_buy_alert ? *current_price >= threshold : *current_price <= threshold);
+            if (crossed && !was_crossed)
+            {
+                pending_watchlist_price_alert_notifications.push_back(PriceAlertNotification{
+                    .item_id = alert.item_id,
+                    .item_name = item_name,
+                    .current_price = *current_price,
+                    .threshold = threshold,
+                    .is_buy_alert = is_buy_alert,
+                    .created_at = now,
+                });
+            }
+
+            if (was_crossed != crossed)
+            {
+                was_crossed = crossed;
+                settings_changed = true;
+            }
+        };
+
+        evaluate(get_api_int_value(prices->second, "buy"), alert.buy_threshold, alert.buy_crossed, true);
+        evaluate(get_api_int_value(prices->second, "sell"), alert.sell_threshold, alert.sell_crossed, false);
+    }
+
+    if (settings_changed)
+        Settings::Save(Globals::SettingsPath);
 }
 
 void Render::update_outdated_order_notifications()
@@ -1820,6 +1982,91 @@ void Render::render_outdated_order_notifications()
     }
 }
 
+void Render::render_watchlist_price_alert_notifications()
+{
+    const auto in_combat = Settings::HideNotificationsInCombat && Globals::IsInCombat();
+
+    if (!in_combat && !pending_watchlist_price_alert_notifications.empty())
+    {
+        const auto now = std::chrono::steady_clock::now();
+        for (auto &pending : pending_watchlist_price_alert_notifications)
+        {
+            pending.created_at = now;
+            watchlist_price_alert_notifications.push_back(std::move(pending));
+        }
+        pending_watchlist_price_alert_notifications.clear();
+    }
+
+    if (watchlist_price_alert_notifications.empty() || in_combat)
+        return;
+
+    static constexpr auto NOTIFICATION_DURATION = std::chrono::seconds(10);
+    static constexpr auto NOTIFICATION_WIDTH = 280.0f;
+    static constexpr auto NOTIFICATION_SPACING = 8.0f;
+
+    const auto now = std::chrono::steady_clock::now();
+    auto offset_y = 10.0f;
+
+    constexpr ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+                                       ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse |
+                                       ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing |
+                                       ImGuiWindowFlags_AlwaysAutoResize;
+
+    auto it = watchlist_price_alert_notifications.begin();
+    while (it != watchlist_price_alert_notifications.end())
+    {
+        if ((now - it->created_at) >= NOTIFICATION_DURATION)
+        {
+            it = watchlist_price_alert_notifications.erase(it);
+            continue;
+        }
+
+        const auto current_price = copper_to_price(it->current_price);
+        const auto threshold = copper_to_price(it->threshold);
+        const auto window_id = "##PriceAlert" + std::to_string(it->item_id) + (it->is_buy_alert ? "Buy" : "Sell");
+        const auto x = (std::max)(10.0f, ImGui::GetIO().DisplaySize.x - NOTIFICATION_WIDTH - 10.0f);
+
+        ImGui::SetNextWindowPos(ImVec2(x, offset_y), ImGuiCond_Always);
+        ImGui::SetNextWindowSize(ImVec2(NOTIFICATION_WIDTH, 0.0f), ImGuiCond_Always);
+        ImGui::SetNextWindowBgAlpha(0.9f);
+
+        auto dismissed = false;
+        if (ImGui::Begin(window_id.c_str(), nullptr, flags))
+        {
+            ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.4f, 1.0f), "%s Price Alert", it->is_buy_alert ? "Buy" : "Sell");
+            ImGui::Separator();
+
+            const auto *icon_texture = get_item_icon_texture(it->item_id);
+            if (icon_texture != nullptr && icon_texture->Resource != nullptr)
+            {
+                ImGui::Image((ImTextureID)icon_texture->Resource, ImVec2(32.0f, 32.0f));
+                ImGui::SameLine();
+            }
+
+            ImGui::BeginGroup();
+            ImGui::TextUnformatted(it->item_name.c_str());
+            ImGui::Text("Current: %dg %ds %dc", current_price.gold, current_price.silver, current_price.copper);
+            ImGui::Text("Threshold: %dg %ds %dc", threshold.gold, threshold.silver, threshold.copper);
+            ImGui::EndGroup();
+            ImGui::TextDisabled("(click to dismiss)");
+
+            if (ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem) && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+                dismissed = true;
+        }
+        const auto window_height = ImGui::GetWindowSize().y;
+        ImGui::End();
+
+        if (dismissed)
+        {
+            it = watchlist_price_alert_notifications.erase(it);
+            continue;
+        }
+
+        offset_y += window_height + NOTIFICATION_SPACING;
+        ++it;
+    }
+}
+
 void Render::calculators_child()
 {
     const auto window_width = ImGui::GetWindowContentRegionWidth();
@@ -1959,7 +2206,9 @@ void Render::settings_child()
 void Render::render()
 {
     update_outdated_order_notifications();
+    update_watchlist_price_alerts();
     render_outdated_order_notifications();
+    render_watchlist_price_alert_notifications();
 
     if (!show_window)
         return;
