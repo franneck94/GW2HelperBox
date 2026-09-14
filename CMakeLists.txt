@@ -61,6 +61,7 @@ target_include_directories(third_party_libs PUBLIC
 add_library(first_party_libs STATIC
     "src/Shared.cpp"
     "src/Settings.cpp"
+    "src/SquadNotes.cpp"
     "src/Render.cpp"
     "src/RenderUI.cpp"
     "src/Data.cpp"
