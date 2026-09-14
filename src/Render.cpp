@@ -44,6 +44,7 @@
 #include "RenderUI.h"
 #include "Settings.h"
 #include "Shared.h"
+#include "SquadNotes.h"
 #include "Types.h"
 
 using json = nlohmann::json;
@@ -1299,6 +1300,187 @@ void Render::characters_child()
     }
 }
 
+void Render::render_note_input(const std::string &account_name)
+{
+    auto &buffer = note_buffers[account_name];
+    if (buffer.empty())
+    {
+        buffer.assign(NOTE_BUFFER_SIZE, '\0');
+        strncpy_s(buffer.data(), buffer.size(), SquadNotes::GetNote(account_name).c_str(), _TRUNCATE);
+    }
+
+    ImGui::PushID(account_name.c_str());
+    ImGui::SetNextItemWidth(-1.0f);
+    ImGui::InputTextWithHint("##Note", "Add a note...", buffer.data(), buffer.size());
+    if (ImGui::IsItemDeactivatedAfterEdit())
+        SquadNotes::SetNote(account_name, buffer.data());
+    ImGui::PopID();
+}
+
+void Render::squad_notes_child()
+{
+    const auto *rtapi = Globals::RTAPIData;
+    const auto rtapi_available = rtapi != nullptr && rtapi->GameBuild != 0;
+
+    if (!rtapi_available)
+        ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.2f, 1.0f),
+                           "RTAPI is not loaded - squad members can only be tracked while it is running.");
+
+    const auto squad = SquadNotes::CurrentSquad();
+    const char *group_label = "Group";
+    if (rtapi_available)
+    {
+        switch (rtapi->GroupType)
+        {
+        case RTAPI::EGroupType::Party:
+            group_label = "Party";
+            break;
+        case RTAPI::EGroupType::RaidSquad:
+        case RTAPI::EGroupType::Squad:
+            group_label = "Squad";
+            break;
+        default:
+            group_label = "Solo";
+            break;
+        }
+    }
+
+    const auto reported_count = rtapi_available ? static_cast<int>(rtapi->GroupMemberCount) : 0;
+    ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.4f, 1.0f), "%s | %zu tracked / %d reported members",
+                       group_label, squad.size(), reported_count);
+
+    /* RTAPI only announces members that join after the addon subscribed, so members who were
+       already grouped up before that never show up until they rejoin. */
+    if (rtapi_available && reported_count > static_cast<int>(squad.size()))
+        ImGui::TextDisabled("Members who joined before GW2HB loaded are not tracked until they rejoin.");
+
+    ImGui::Spacing();
+
+    constexpr ImGuiTableFlags flags = ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
+                                      ImGuiTableFlags_Resizable | ImGuiTableFlags_ScrollY;
+    if (squad.empty())
+    {
+        ImGui::TextDisabled("Nobody in the squad right now.");
+    }
+    else if (ImGui::BeginTable("SquadNotesTable", 4, flags, ImVec2(0.0f, 260.0f)))
+    {
+        ImGui::TableSetupScrollFreeze(0, 1);
+        ImGui::TableSetupColumn("Sub", ImGuiTableColumnFlags_WidthFixed, 35.0f);
+        ImGui::TableSetupColumn("Account", ImGuiTableColumnFlags_WidthFixed, 170.0f);
+        ImGui::TableSetupColumn("Character", ImGuiTableColumnFlags_WidthFixed, 150.0f);
+        ImGui::TableSetupColumn("Note", ImGuiTableColumnFlags_WidthStretch);
+        ImGui::TableHeadersRow();
+
+        for (const auto &member : squad)
+        {
+            ImGui::TableNextRow();
+            ImGui::TableNextColumn();
+            if (member.subgroup > 0)
+                ImGui::Text("%d", member.subgroup);
+            else
+                ImGui::TextUnformatted("-");
+
+            ImGui::TableNextColumn();
+            if (member.is_commander)
+                ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.4f, 1.0f), "%s", member.account_name.c_str());
+            else if (member.is_self)
+                ImGui::TextColored(ImVec4(0.5f, 0.8f, 1.0f, 1.0f), "%s", member.account_name.c_str());
+            else
+                ImGui::TextUnformatted(member.account_name.c_str());
+            if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+                ImGui::SetClipboardText(member.account_name.c_str());
+
+            ImGui::TableNextColumn();
+            ImGui::TextUnformatted(member.character_name.c_str());
+
+            ImGui::TableNextColumn();
+            render_note_input(member.account_name);
+        }
+
+        ImGui::EndTable();
+    }
+
+    ImGui::Spacing();
+    ImGui::Separator();
+    ImGui::Spacing();
+
+    ImGui::Checkbox("Show all saved accounts", &show_all_account_notes);
+    if (!show_all_account_notes)
+        return;
+
+    static char account_filter[64] = {};
+    static char new_account[64] = {};
+
+    ImGui::TextUnformatted("Search");
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(200.0f);
+    ImGui::InputText("##AccountNoteFilter", account_filter, sizeof(account_filter));
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(160.0f);
+    ImGui::InputTextWithHint("##NewAccountNote", "Account.1234", new_account, sizeof(new_account));
+    ImGui::SameLine();
+    if (ImGui::Button("Add##AccountNote") && new_account[0] != '\0')
+    {
+        SquadNotes::AddAccount(new_account);
+        new_account[0] = '\0';
+    }
+
+    const auto to_lower = [](std::string value)
+    {
+        std::transform(value.begin(), value.end(), value.begin(), [](unsigned char c)
+                       { return static_cast<char>(std::tolower(c)); });
+        return value;
+    };
+    const auto filter = to_lower(account_filter);
+
+    const auto all_notes = SquadNotes::AllNotes();
+    std::string account_to_remove;
+
+    if (ImGui::BeginTable("AllAccountNotesTable", 4, flags, ImVec2(0.0f, 260.0f)))
+    {
+        ImGui::TableSetupScrollFreeze(0, 1);
+        ImGui::TableSetupColumn("Account", ImGuiTableColumnFlags_WidthFixed, 170.0f);
+        ImGui::TableSetupColumn("Last Seen", ImGuiTableColumnFlags_WidthFixed, 120.0f);
+        ImGui::TableSetupColumn("Note", ImGuiTableColumnFlags_WidthStretch);
+        ImGui::TableSetupColumn("##Actions", ImGuiTableColumnFlags_WidthFixed, 60.0f);
+        ImGui::TableHeadersRow();
+
+        for (const auto &[account_name, note] : all_notes)
+        {
+            if (!filter.empty() && to_lower(account_name).find(filter) == std::string::npos)
+                continue;
+
+            ImGui::TableNextRow();
+            ImGui::TableNextColumn();
+            ImGui::TextUnformatted(account_name.c_str());
+            if (ImGui::IsItemHovered() && !note.last_character.empty())
+            {
+                ImGui::BeginTooltip();
+                ImGui::Text("Last character: %s\nSeen %d time(s)", note.last_character.c_str(), note.times_seen);
+                ImGui::EndTooltip();
+            }
+
+            ImGui::TableNextColumn();
+            ImGui::TextUnformatted(note.last_seen.c_str());
+
+            ImGui::TableNextColumn();
+            render_note_input(account_name);
+
+            ImGui::TableNextColumn();
+            if (ImGui::SmallButton(("Remove##" + account_name).c_str()))
+                account_to_remove = account_name;
+        }
+
+        ImGui::EndTable();
+    }
+
+    if (!account_to_remove.empty())
+    {
+        SquadNotes::RemoveAccount(account_to_remove);
+        note_buffers.erase(account_to_remove);
+    }
+}
+
 void Render::collections_child()
 {
     if (!account_skins_requested)
@@ -2519,6 +2701,12 @@ void Render::render()
             if (ImGui::BeginTabItem("Characters"))
             {
                 characters_child();
+                ImGui::EndTabItem();
+            }
+
+            if (ImGui::BeginTabItem("Squad Notes"))
+            {
+                squad_notes_child();
                 ImGui::EndTabItem();
             }
 
