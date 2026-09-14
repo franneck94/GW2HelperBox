@@ -66,6 +66,16 @@ struct CustomItem
 };
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(CustomItem, item_id, name)
 
+struct WatchlistPriceAlert
+{
+    int item_id = 0;
+    int buy_threshold = 0;
+    int sell_threshold = 0;
+    bool buy_crossed = false;
+    bool sell_crossed = false;
+};
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(WatchlistPriceAlert, item_id, buy_threshold, sell_threshold, buy_crossed, sell_crossed)
+
 struct SecondaryAccount
 {
     std::string name;    // user-defined label shown in the Completions account picker
@@ -105,6 +115,16 @@ struct OutdatedOrderNotification
     std::string item_name;
     int my_price;
     int curr_price;
+    std::chrono::steady_clock::time_point created_at;
+};
+
+struct PriceAlertNotification
+{
+    int item_id;
+    std::string item_name;
+    int current_price;
+    int threshold;
+    bool is_buy_alert;
     std::chrono::steady_clock::time_point created_at;
 };
 
