@@ -16,6 +16,7 @@ const char *HIDE_NOTIFICATIONS_IN_COMBAT = "HideNotificationsInCombat";
 const char *RAID_BOSSES_ONLY = "RaidBossesOnly";
 const char *NOTIFIED_OUTDATED_ORDER_IDS = "NotifiedOutdatedOrderIds";
 const char *CUSTOM_ITEMS = "CustomItems";
+const char *WATCHLIST_PRICE_ALERTS = "WatchlistPriceAlerts";
 const char *FINISHED_COLLECTIONS = "FinishedCollections";
 const char *SECONDARY_API_KEYS = "SecondaryAPIKeys";
 const char *COMPLETION_CACHES = "CompletionCaches";
@@ -83,6 +84,9 @@ namespace Settings
                 CustomItems.push_back(CustomItem{item_id, ""});
         }
 
+        if (!Settings[WATCHLIST_PRICE_ALERTS].is_null())
+            Settings[WATCHLIST_PRICE_ALERTS].get_to<std::vector<WatchlistPriceAlert>>(WatchlistPriceAlerts);
+
         if (!Settings[FINISHED_COLLECTIONS].is_null())
             Settings[FINISHED_COLLECTIONS].get_to<std::set<std::string>>(FinishedCollections);
 
@@ -109,6 +113,7 @@ namespace Settings
             Settings[RAID_BOSSES_ONLY] = RaidBossesOnly;
             Settings[NOTIFIED_OUTDATED_ORDER_IDS] = NotifiedOutdatedOrderIds;
             Settings[CUSTOM_ITEMS] = CustomItems;
+            Settings[WATCHLIST_PRICE_ALERTS] = WatchlistPriceAlerts;
             Settings[FINISHED_COLLECTIONS] = FinishedCollections;
             Settings[SECONDARY_API_KEYS] = SecondaryAPIKeys;
             Settings[COMPLETION_CACHES] = CompletionCaches;
@@ -140,6 +145,7 @@ namespace Settings
     bool RaidBossesOnly = false;
     std::set<int> NotifiedOutdatedOrderIds;
     std::vector<CustomItem> CustomItems;
+    std::vector<WatchlistPriceAlert> WatchlistPriceAlerts;
     std::set<std::string> FinishedCollections;
     std::vector<SecondaryAccount> SecondaryAPIKeys;
     std::map<std::string, CompletionCache> CompletionCaches;
