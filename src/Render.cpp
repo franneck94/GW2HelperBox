@@ -1049,6 +1049,256 @@ void Render::weekly_child()
     }
 }
 
+void Render::characters_child()
+{
+    /* main account first, then any secondary keys the user added in Settings */
+    std::vector<std::pair<std::string, std::string>> accounts;
+    accounts.emplace_back("Main", Settings::APIKey);
+    for (const auto &account : Settings::SecondaryAPIKeys)
+        accounts.emplace_back(account.name, account.api_key);
+
+    if (characters_account_index >= static_cast<int>(accounts.size()))
+        characters_account_index = 0;
+
+    ImGui::TextUnformatted("Account");
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(200.0f);
+    if (ImGui::BeginCombo("##CharactersAccount", accounts[characters_account_index].first.c_str()))
+    {
+        for (auto account_index = 0; account_index < static_cast<int>(accounts.size()); ++account_index)
+        {
+            const auto selected = characters_account_index == account_index;
+            if (ImGui::Selectable(accounts[account_index].first.c_str(), selected) && !selected && !characters_requested)
+                characters_account_index = account_index;
+            if (selected)
+                ImGui::SetItemDefaultFocus();
+        }
+        ImGui::EndCombo();
+    }
+
+    const auto &selected_key = accounts[characters_account_index].second;
+
+    if (loaded_characters_account_key != selected_key)
+    {
+        loaded_characters_account_key = selected_key;
+        characters.clear();
+        characters_loaded = false;
+        characters_requested = false;
+        characters_error.clear();
+        characters_future.reset();
+    }
+
+    if (selected_key.empty())
+    {
+        ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.2f, 1.0f), "Set an API key for this account in the Settings tab to list its characters.");
+        return;
+    }
+
+    if (!characters_requested && !characters_loaded)
+    {
+        const auto url = L"https://api.guildwars2.com/v2/characters?ids=all&access_token=" +
+                         std::wstring(selected_key.begin(), selected_key.end());
+        characters_future = HTTPClient::GetRequestAsync(url);
+        characters_requested = true;
+        characters_error.clear();
+    }
+
+    if (characters_future.has_value() &&
+        characters_future->wait_for(std::chrono::seconds(0)) == std::future_status::ready)
+    {
+        try
+        {
+            const auto j = json::parse(characters_future->get());
+            if (j.is_array())
+            {
+                characters.clear();
+                for (const auto &entry : j)
+                {
+                    CharacterInfo info;
+                    info.name = entry.value("name", std::string{});
+                    info.race = entry.value("race", std::string{});
+                    info.profession = entry.value("profession", std::string{});
+                    info.level = entry.value("level", 0);
+                    info.age_seconds = entry.value("age", 0LL);
+                    info.created = entry.value("created", std::string{});
+                    info.deaths = entry.value("deaths", 0);
+
+                    /* "bags" is only sent when the key carries the inventories scope */
+                    if (entry.contains("bags") && entry["bags"].is_array())
+                    {
+                        info.has_inventory = true;
+                        for (const auto &bag : entry["bags"])
+                            if (!bag.is_null())
+                                info.inventory_slots += bag.value("size", 0);
+                    }
+
+                    for (const auto &craft : entry.value("crafting", json::array()))
+                        info.crafting.push_back(CharacterCrafting{craft.value("discipline", std::string{}),
+                                                                  craft.value("rating", 0),
+                                                                  craft.value("active", false)});
+
+                    characters.push_back(std::move(info));
+                }
+            }
+            else if (j.contains("text"))
+                characters_error = j["text"].get<std::string>();
+            else
+                characters_error = "Unexpected response from GW2 API.";
+        }
+        catch (const std::exception &e)
+        {
+            characters_error = std::string("Failed to parse response: ") + e.what();
+        }
+        characters_future.reset();
+        characters_requested = false;
+        characters_loaded = true;
+    }
+
+    if (ImGui::Button("Refresh") && !characters_requested)
+    {
+        characters.clear();
+        characters_loaded = false;
+    }
+
+    ImGui::SameLine();
+    if (characters_requested)
+        ImGui::TextUnformatted("Loading...");
+    else if (!characters_error.empty())
+        ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "%s", characters_error.c_str());
+
+    if (!characters_loaded || !characters_error.empty())
+        return;
+
+    auto total_age = 0LL;
+    auto total_deaths = 0LL;
+    auto missing_inventory_scope = false;
+    for (const auto &info : characters)
+    {
+        total_age += info.age_seconds;
+        total_deaths += info.deaths;
+        missing_inventory_scope = missing_inventory_scope || !info.has_inventory;
+    }
+
+    ImGui::Spacing();
+    ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.4f, 1.0f), "%zu characters | %lldh played | %lld deaths",
+                       characters.size(), total_age / 3600, total_deaths);
+
+    if (missing_inventory_scope)
+        ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.2f, 1.0f),
+                           "Inventory slots need an API key with the \"inventories\" scope.");
+
+    ImGui::Spacing();
+
+    constexpr ImGuiTableFlags flags = ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
+                                      ImGuiTableFlags_Resizable | ImGuiTableFlags_Sortable |
+                                      ImGuiTableFlags_ScrollY;
+    if (!ImGui::BeginTable("CharactersTable", 8, flags, ImVec2(0.0f, 400.0f)))
+        return;
+
+    ImGui::TableSetupScrollFreeze(0, 1);
+    ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_DefaultSort, 150.0f, 0);
+    ImGui::TableSetupColumn("Lvl", ImGuiTableColumnFlags_WidthFixed, 35.0f, 1);
+    ImGui::TableSetupColumn("Profession", ImGuiTableColumnFlags_WidthFixed, 100.0f, 2);
+    ImGui::TableSetupColumn("Race", ImGuiTableColumnFlags_WidthFixed, 70.0f, 3);
+    ImGui::TableSetupColumn("Played", ImGuiTableColumnFlags_WidthFixed, 90.0f, 4);
+    ImGui::TableSetupColumn("Created", ImGuiTableColumnFlags_WidthFixed, 90.0f, 5);
+    ImGui::TableSetupColumn("Deaths", ImGuiTableColumnFlags_WidthFixed, 60.0f, 6);
+    ImGui::TableSetupColumn("Slots", ImGuiTableColumnFlags_WidthFixed, 50.0f, 7);
+    ImGui::TableHeadersRow();
+
+    if (auto *sort_specs = ImGui::TableGetSortSpecs();
+        sort_specs != nullptr && sort_specs->SpecsDirty && sort_specs->SpecsCount > 0)
+    {
+        const auto &spec = sort_specs->Specs[0];
+        const auto compare = [&](const CharacterInfo &lhs, const CharacterInfo &rhs)
+        {
+            switch (spec.ColumnUserID)
+            {
+            case 1:
+                return lhs.level < rhs.level;
+            case 2:
+                return lhs.profession < rhs.profession;
+            case 3:
+                return lhs.race < rhs.race;
+            case 4:
+                return lhs.age_seconds < rhs.age_seconds;
+            case 5:
+                return lhs.created < rhs.created;
+            case 6:
+                return lhs.deaths < rhs.deaths;
+            case 7:
+                return lhs.inventory_slots < rhs.inventory_slots;
+            default:
+                return lhs.name < rhs.name;
+            }
+        };
+
+        const auto ascending = spec.SortDirection == ImGuiSortDirection_Ascending;
+        std::sort(characters.begin(), characters.end(),
+                  [&](const CharacterInfo &lhs, const CharacterInfo &rhs)
+                  { return ascending ? compare(lhs, rhs) : compare(rhs, lhs); });
+        sort_specs->SpecsDirty = false;
+    }
+
+    for (const auto &info : characters)
+    {
+        ImGui::TableNextRow();
+
+        ImGui::TableNextColumn();
+        ImGui::TextUnformatted(info.name.c_str());
+
+        ImGui::TableNextColumn();
+        ImGui::Text("%d", info.level);
+
+        ImGui::TableNextColumn();
+        ImGui::TextUnformatted(info.profession.c_str());
+
+        ImGui::TableNextColumn();
+        ImGui::TextUnformatted(info.race.c_str());
+
+        ImGui::TableNextColumn();
+        ImGui::Text("%lldh %lldm", info.age_seconds / 3600, (info.age_seconds % 3600) / 60);
+
+        ImGui::TableNextColumn();
+        ImGui::TextUnformatted(info.created.substr(0, 10).c_str());
+
+        ImGui::TableNextColumn();
+        ImGui::Text("%d", info.deaths);
+
+        ImGui::TableNextColumn();
+        if (info.has_inventory)
+            ImGui::Text("%d", info.inventory_slots);
+        else
+            ImGui::TextDisabled("-");
+    }
+
+    ImGui::EndTable();
+
+    ImGui::Spacing();
+    ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.4f, 1.0f), "Crafting");
+    ImGui::Separator();
+
+    for (const auto &info : characters)
+    {
+        if (info.crafting.empty())
+            continue;
+
+        ImGui::TextUnformatted(info.name.c_str());
+        ImGui::SameLine(180.0f);
+        for (auto craft_index = 0; craft_index < static_cast<int>(info.crafting.size()); ++craft_index)
+        {
+            const auto &craft = info.crafting[craft_index];
+            if (craft_index > 0)
+                ImGui::SameLine();
+            /* inactive disciplines are still learned but cost gold to swap back in */
+            if (craft.active)
+                ImGui::Text("%s %d", craft.discipline.c_str(), craft.rating);
+            else
+                ImGui::TextDisabled("%s %d", craft.discipline.c_str(), craft.rating);
+        }
+    }
+}
+
 void Render::collections_child()
 {
     if (!account_skins_requested)
@@ -2263,6 +2513,12 @@ void Render::render()
             if (ImGui::BeginTabItem("Completions"))
             {
                 weekly_child();
+                ImGui::EndTabItem();
+            }
+
+            if (ImGui::BeginTabItem("Characters"))
+            {
+                characters_child();
                 ImGui::EndTabItem();
             }
 
