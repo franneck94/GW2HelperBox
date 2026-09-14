@@ -83,6 +83,26 @@ struct SecondaryAccount
 };
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(SecondaryAccount, name, api_key)
 
+struct AccountNote
+{
+    std::string note;
+    std::string last_character;
+    std::string last_seen; // local "YYYY-MM-DD HH:MM" of the most recent squad join
+    int times_seen = 0;
+};
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(AccountNote, note, last_character, last_seen, times_seen)
+
+struct SquadMember
+{
+    std::string account_name;
+    std::string character_name;
+    int subgroup = 0; // 0 for parties, 1-15 for squads
+    bool is_self = false;
+    bool is_commander = false;
+    bool is_lieutenant = false;
+    bool is_in_instance = false;
+};
+
 struct CharacterCrafting
 {
     std::string discipline;
