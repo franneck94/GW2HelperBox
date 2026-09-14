@@ -10,6 +10,11 @@ All notable changes to this project will be documented in this file.
 3. Start the game and load the Addon. This will trigger the download of the updated. exe files
 4. Restart the game
 
+## 1.1.0
+
+- Merged Orders & Material Orders Tab
+- Added Squad Notes Feature
+
 ## 1.0.0
 
 - Restarted project as GW2HelperBox++
