@@ -60,6 +60,8 @@ private:
 
     void update_outdated_order_notifications();
     void render_outdated_order_notifications();
+    void update_watchlist_price_alerts();
+    void render_watchlist_price_alert_notifications();
     Texture *get_item_icon_texture(int item_id);
 
     std::vector<OutdatedOrderNotification> outdated_order_notifications;
@@ -68,6 +70,9 @@ private:
     std::chrono::steady_clock::time_point last_my_orders_poll_time{};
     bool my_orders_polling_started = false;
     bool outdated_order_baseline_initialized = false;
+    std::vector<PriceAlertNotification> watchlist_price_alert_notifications;
+    std::vector<PriceAlertNotification> pending_watchlist_price_alert_notifications;
+    bool watchlist_alerts_evaluated_for_load = false;
 
     std::optional<std::future<std::string>> account_skins_future;
     std::set<int> unlocked_skins;
