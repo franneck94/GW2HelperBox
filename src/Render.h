@@ -55,6 +55,8 @@ private:
     void settings_child();
     void weekly_child();
     void characters_child();
+    void squad_notes_child();
+    void render_note_input(const std::string &account_name);
 
     int render_custom_item_table(const std::string &request_id, const std::string &display_name);
     void watchlist_child();
@@ -127,4 +129,8 @@ private:
     std::string characters_error;
     int characters_account_index = 0; // 0 = main account, 1..N = secondary keys
     std::string loaded_characters_account_key;
+
+    static constexpr int NOTE_BUFFER_SIZE = 512;
+    std::map<std::string, std::vector<char>> note_buffers; // account name -> editable note text
+    bool show_all_account_notes = false;
 };
