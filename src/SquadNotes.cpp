@@ -154,8 +154,8 @@ namespace SquadNotes
 
         std::vector<SquadMember> members;
         members.reserve(squad.size());
-        for (const auto &[account_name, member] : squad)
-            members.push_back(member);
+        for (const auto &entry : squad)
+            members.push_back(entry.second);
 
         std::sort(members.begin(), members.end(), [](const auto &lhs, const auto &rhs)
                   {
