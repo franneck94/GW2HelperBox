@@ -54,6 +54,7 @@ private:
     void calculators_child();
     void settings_child();
     void weekly_child();
+    void characters_child();
 
     int render_custom_item_table(const std::string &request_id, const std::string &display_name);
     void watchlist_child();
@@ -118,4 +119,12 @@ private:
     std::set<std::string> cleared_raid_events;
     std::set<std::string> cleared_dungeon_paths;
     std::set<std::string> killed_world_bosses;
+
+    std::optional<std::future<std::string>> characters_future;
+    std::vector<CharacterInfo> characters;
+    bool characters_requested = false;
+    bool characters_loaded = false;
+    std::string characters_error;
+    int characters_account_index = 0; // 0 = main account, 1..N = secondary keys
+    std::string loaded_characters_account_key;
 };
