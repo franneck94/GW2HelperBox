@@ -83,6 +83,27 @@ struct SecondaryAccount
 };
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(SecondaryAccount, name, api_key)
 
+struct CharacterCrafting
+{
+    std::string discipline;
+    int rating = 0;
+    bool active = false; // at most two disciplines can be active at a time
+};
+
+struct CharacterInfo
+{
+    std::string name;
+    std::string race;
+    std::string profession;
+    int level = 0;
+    long long age_seconds = 0;  // total time played, as reported by the API
+    std::string created;        // ISO 8601 creation timestamp
+    int deaths = 0;
+    int inventory_slots = 0;    // sum of the sizes of all equipped bags
+    bool has_inventory = false; // false when the API key is missing the "inventories" scope
+    std::vector<CharacterCrafting> crafting;
+};
+
 struct RaidEvent
 {
     std::string id;
