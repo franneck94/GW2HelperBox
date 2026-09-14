@@ -690,6 +690,14 @@ void Render::my_orders_child()
     if (ImGui::CollapsingHeader(("Sell Orders (Lowest Sell) (" + std::to_string(data.my_orders_sells_current.size()) + ")###MyOrdersSellsCurrentHeader").c_str()))
         render_my_orders_table("MyOrdersSellsCurrentTable", data.my_orders_sells_current);
 
+    ImGui::Spacing();
+    ImGui::Separator();
+    ImGui::Spacing();
+
+    ImGui::SetNextItemOpen(false, ImGuiCond_Once);
+    if (ImGui::CollapsingHeader("Tracked Material Totals (Elder Wood, Mithril, T5 & T6 Mats)###MyOrdersMaterialTotalsHeader"))
+        render_my_orders_material_totals_table(data.my_orders_buys, data.my_orders_sells);
+
     if (copied_name_popup_requested)
     {
         ImGui::OpenPopup("NameCopiedPopup");
@@ -703,38 +711,6 @@ void Render::my_orders_child()
             ImGui::CloseCurrentPopup();
         ImGui::EndPopup();
     }
-}
-
-void Render::material_totals_child()
-{
-    if (!data.loaded)
-    {
-        ImGui::TextUnformatted("Loading price data before requesting orders...");
-        return;
-    }
-
-    if (!data.my_orders_requested)
-        data.request_my_orders();
-    data.store_my_orders();
-
-    if (ImGui::Button("Refresh My Orders"))
-    {
-        data.my_orders_requested = false;
-        data.request_my_orders();
-    }
-
-    ImGui::SameLine();
-    if (!data.my_orders_loaded)
-        ImGui::TextUnformatted("Loading...");
-    else if (!data.my_orders_error.empty())
-        ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "%s", data.my_orders_error.c_str());
-
-    ImGui::Spacing();
-    ImGui::Separator();
-    ImGui::Spacing();
-
-    ImGui::TextUnformatted("Tracked Material Totals (Elder Wood, Mithril, T5 & T6 Mats)");
-    render_my_orders_material_totals_table(data.my_orders_buys, data.my_orders_sells);
 }
 
 void Render::weekly_child()
@@ -2665,12 +2641,6 @@ void Render::render()
             if (ImGui::BeginTabItem("Orders"))
             {
                 my_orders_child();
-                ImGui::EndTabItem();
-            }
-
-            if (ImGui::BeginTabItem("Material Orders"))
-            {
-                material_totals_child();
                 ImGui::EndTabItem();
             }
 
