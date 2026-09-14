@@ -43,6 +43,7 @@ namespace Settings
     extern bool RaidBossesOnly;
     extern std::set<int> NotifiedOutdatedOrderIds;
     extern std::vector<CustomItem> CustomItems;
+    extern std::vector<WatchlistPriceAlert> WatchlistPriceAlerts;
     extern std::set<std::string> FinishedCollections;
     extern std::vector<SecondaryAccount> SecondaryAPIKeys;
     extern std::map<std::string, CompletionCache> CompletionCaches;
