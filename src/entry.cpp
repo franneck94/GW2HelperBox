@@ -21,6 +21,7 @@
 #include "RenderUI.h"
 #include "Settings.h"
 #include "Shared.h"
+#include "SquadNotes.h"
 #include "Version.h"
 
 namespace dx = DirectX;
@@ -30,6 +31,8 @@ void AddonUnload();
 void AddonRender();
 void AddonOptions();
 void OnRTAPIGroupMemberJoined(void *aEventArgs);
+void OnRTAPIGroupMemberLeft(void *aEventArgs);
+void OnRTAPIGroupMemberUpdated(void *aEventArgs);
 
 HMODULE hSelf;
 AddonDefinition AddonDef{};
@@ -41,8 +44,10 @@ void SubscribeRTAPIGroupEvent()
     if (!RTAPIGroupEventSubscribed && Globals::APIDefs != nullptr)
     {
         Globals::APIDefs->SubscribeEvent(EV_RTAPI_GROUP_MEMBER_JOINED, static_cast<EVENT_CONSUME>(OnRTAPIGroupMemberJoined));
+        Globals::APIDefs->SubscribeEvent(EV_RTAPI_GROUP_MEMBER_LEFT, static_cast<EVENT_CONSUME>(OnRTAPIGroupMemberLeft));
+        Globals::APIDefs->SubscribeEvent(EV_RTAPI_GROUP_MEMBER_UPDATED, static_cast<EVENT_CONSUME>(OnRTAPIGroupMemberUpdated));
         RTAPIGroupEventSubscribed = true;
-        Globals::APIDefs->Log(ELogLevel_DEBUG, Globals::ADDON_NAME, "Subscribed to RTAPI group member joined events.");
+        Globals::APIDefs->Log(ELogLevel_DEBUG, Globals::ADDON_NAME, "Subscribed to RTAPI group member events.");
     }
 }
 
@@ -51,6 +56,8 @@ void UnsubscribeRTAPIGroupEvent()
     if (RTAPIGroupEventSubscribed && Globals::APIDefs != nullptr)
     {
         Globals::APIDefs->UnsubscribeEvent(EV_RTAPI_GROUP_MEMBER_JOINED, static_cast<EVENT_CONSUME>(OnRTAPIGroupMemberJoined));
+        Globals::APIDefs->UnsubscribeEvent(EV_RTAPI_GROUP_MEMBER_LEFT, static_cast<EVENT_CONSUME>(OnRTAPIGroupMemberLeft));
+        Globals::APIDefs->UnsubscribeEvent(EV_RTAPI_GROUP_MEMBER_UPDATED, static_cast<EVENT_CONSUME>(OnRTAPIGroupMemberUpdated));
         RTAPIGroupEventSubscribed = false;
     }
 }
@@ -129,40 +136,74 @@ void OnRTAPIUnloadedEvent(void *aEventArgs)
     Globals::RTAPIData = nullptr;
 }
 
+namespace
+{
+    SquadMember ToSquadMember(const RTAPI::GroupMember *member)
+    {
+        const auto read_name = [](const char *name, size_t capacity)
+        {
+            return std::string(name, strnlen_s(name, capacity));
+        };
+
+        return SquadMember{
+            read_name(member->AccountName, sizeof(member->AccountName)),
+            read_name(member->CharacterName, sizeof(member->CharacterName)),
+            static_cast<int>(member->Subgroup),
+            member->IsSelf != 0,
+            member->IsCommander != 0,
+            member->IsLieutenant != 0,
+            member->IsInInstance != 0,
+        };
+    }
+
+    const char *CurrentGroupLabel()
+    {
+        if (Globals::RTAPIData == nullptr)
+            return "group";
+
+        switch (Globals::RTAPIData->GroupType)
+        {
+        case RTAPI::EGroupType::Party:
+            return "party";
+        case RTAPI::EGroupType::RaidSquad:
+        case RTAPI::EGroupType::Squad:
+            return "squad";
+        default:
+            return "group";
+        }
+    }
+}
+
 void OnRTAPIGroupMemberJoined(void *aEventArgs)
 {
     if (aEventArgs == nullptr || Globals::APIDefs == nullptr)
         return;
 
-    const auto *member = static_cast<RTAPI::GroupMember *>(aEventArgs);
-    const auto read_name = [](const char *name, size_t capacity)
-    {
-        return std::string(name, strnlen_s(name, capacity));
-    };
-    const std::string account = read_name(member->AccountName, sizeof(member->AccountName));
-    const std::string character = read_name(member->CharacterName, sizeof(member->CharacterName));
+    const auto member = ToSquadMember(static_cast<RTAPI::GroupMember *>(aEventArgs));
+    SquadNotes::MemberJoined(member);
 
-    const char *group = "group";
-    if (Globals::RTAPIData != nullptr)
-    {
-        switch (Globals::RTAPIData->GroupType)
-        {
-        case RTAPI::EGroupType::Party:
-            group = "party";
-            break;
-        case RTAPI::EGroupType::RaidSquad:
-        case RTAPI::EGroupType::Squad:
-            group = "squad";
-            break;
-        default:
-            break;
-        }
-    }
-
-    std::string message = std::string("Joined ") + group + ": " + (account.empty() ? "<unknown>" : account);
-    if (!character.empty())
-        message += " (" + character + ")";
+    std::string message = std::string("Joined ") + CurrentGroupLabel() + ": " +
+                          (member.account_name.empty() ? "<unknown>" : member.account_name);
+    if (!member.character_name.empty())
+        message += " (" + member.character_name + ")";
     Globals::APIDefs->Log(ELogLevel_INFO, Globals::ADDON_NAME, message.c_str());
+}
+
+void OnRTAPIGroupMemberLeft(void *aEventArgs)
+{
+    if (aEventArgs == nullptr || Globals::APIDefs == nullptr)
+        return;
+
+    const auto member = ToSquadMember(static_cast<RTAPI::GroupMember *>(aEventArgs));
+    SquadNotes::MemberLeft(member.account_name);
+}
+
+void OnRTAPIGroupMemberUpdated(void *aEventArgs)
+{
+    if (aEventArgs == nullptr || Globals::APIDefs == nullptr)
+        return;
+
+    SquadNotes::MemberUpdated(ToSquadMember(static_cast<RTAPI::GroupMember *>(aEventArgs)));
 }
 
 void AddonLoad(AddonAPI *aApi)
@@ -184,8 +225,10 @@ void AddonLoad(AddonAPI *aApi)
     Globals::APIDefs->RegisterRender(ERenderType_OptionsRender, AddonOptions);
     Globals::AddonPath = Globals::APIDefs->GetAddonDirectory(Globals::ADDON_NAME);
     Globals::SettingsPath = Globals::APIDefs->GetAddonDirectory("GW2HB/settings.json");
+    Globals::SquadNotesPath = Globals::APIDefs->GetAddonDirectory("GW2HB/squad_notes.json");
     std::filesystem::create_directory(Globals::AddonPath);
     Settings::Load(Globals::SettingsPath);
+    SquadNotes::Load(Globals::SquadNotesPath);
     Settings::ShowWindow = false;
 
     // Initialize KeyboardCapture
@@ -251,6 +294,7 @@ void AddonUnload()
     }
 
     Settings::Save(Globals::SettingsPath);
+    SquadNotes::Save(Globals::SquadNotesPath);
 
     DeregisterQuickAccessShortcut();
     Globals::APIDefs->DeregisterKeybind(Globals::KB_TOGGLE_GW2HB);
@@ -260,6 +304,8 @@ void AddonRender()
 {
     if ((!Globals::NexusLink) || (!Globals::NexusLink->IsGameplay))
         return;
+
+    SquadNotes::Tick(Globals::SquadNotesPath);
 
     if (Settings::ShowWindow)
     {
