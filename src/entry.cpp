@@ -302,7 +302,15 @@ void AddonUnload()
 
 void AddonRender()
 {
-    if ((!Globals::NexusLink) || (!Globals::NexusLink->IsGameplay))
+    if (!Globals::NexusLink)
+        return;
+
+    const auto &io = ImGui::GetIO();
+    /* IsGameplay drops out on map open, chat focus and alt-tab. Skipping a frame means our widgets
+       are never submitted, which makes ImGui clear the active ID and kicks the caret out of input
+       fields, so keep drawing while the user is interacting. */
+    const auto interacting = io.WantTextInput || ImGui::IsAnyItemActive();
+    if (!Globals::NexusLink->IsGameplay && !interacting)
         return;
 
     SquadNotes::Tick(Globals::SquadNotesPath);
@@ -311,14 +319,19 @@ void AddonRender()
     {
         auto &keyboard = KeyboardCapture::GetInstance();
 
-        if (keyboard.WasKeyPressed(VK_ESCAPE))
+        /* always drain the latches, but ignore the hotkeys while an ImGui field owns the keyboard:
+           ESC has to cancel the edit and CTRL+C has to copy instead of killing the scripts */
+        const auto escape_pressed = keyboard.WasKeyPressed(VK_ESCAPE);
+        const auto interrupt_pressed = keyboard.IsKeyDown(VK_CONTROL) && keyboard.WasKeyPressed('C');
+
+        if (escape_pressed && !interacting)
         {
             Settings::ShowWindow = false;
             Settings::Save(Globals::SettingsPath);
             return;
         }
 
-        if (keyboard.IsKeyDown(VK_CONTROL) && keyboard.WasKeyPressed('C'))
+        if (interrupt_pressed && !interacting)
         {
             if (Globals::ForgeProcessInfo.hProcess)
             {
