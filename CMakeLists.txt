@@ -95,6 +95,12 @@ set_target_properties(GW2HB PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY_RELEASE "${CMAKE_SOURCE_DIR}/bin/release"
 )
 add_custom_command(TARGET GW2HB POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_SOURCE_DIR}/scripts/merge_squad_notes.ps1"
+        "${CMAKE_SOURCE_DIR}/bin/$<LOWER_CASE:$<CONFIG>>/merge_squad_notes.ps1"
+    COMMENT "Copying merge_squad_notes.ps1 to bin/$<LOWER_CASE:$<CONFIG>>"
+)
+add_custom_command(TARGET GW2HB POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
         "${CMAKE_SOURCE_DIR}/bin/$<CONFIG>"
         "D:/GW2/addons"
