@@ -1280,63 +1280,86 @@ void Render::weekly_child()
                                                { return objective.progress_complete > 0 && objective.progress_current >= objective.progress_complete; });
     const auto vault_claimed = std::count_if(wizard_vault_weekly.begin(), wizard_vault_weekly.end(), [](const WizardVaultObjective &objective)
                                              { return objective.claimed; });
-    ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.4f, 1.0f), "Wizard's Vault Weekly (%zu/%zu complete, %zu claimed)",
-                       vault_completed, wizard_vault_weekly.size(), vault_claimed);
-    ImGui::Separator();
-    if (!wizard_vault_weekly_error.empty())
-        ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.2f, 1.0f), "%s", wizard_vault_weekly_error.c_str());
-    else if (wizard_vault_weekly.empty())
-        ImGui::TextDisabled("No weekly objective data. Click Refresh to load it.");
-
-    constexpr ImGuiTableFlags vault_flags = ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable;
-    if (!wizard_vault_weekly.empty() && ImGui::BeginTable("WizardVaultWeeklyTable", 5, vault_flags))
+    const auto vault_header = "Wizard's Vault Weekly (" + std::to_string(vault_completed) + "/" +
+                              std::to_string(wizard_vault_weekly.size()) + " complete, " +
+                              std::to_string(vault_claimed) + " claimed)###WizardVaultWeeklyHeader";
+    ImGui::SetNextItemOpen(false, ImGuiCond_Once);
+    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.85f, 0.4f, 1.0f));
+    const auto vault_expanded = ImGui::CollapsingHeader(vault_header.c_str());
+    ImGui::PopStyleColor();
+    if (vault_expanded)
     {
-        ImGui::TableSetupColumn("Objective", ImGuiTableColumnFlags_WidthStretch);
-        ImGui::TableSetupColumn("Track", ImGuiTableColumnFlags_WidthFixed, 55.0f);
-        ImGui::TableSetupColumn("Progress", ImGuiTableColumnFlags_WidthFixed, 75.0f);
-        ImGui::TableSetupColumn("AA", ImGuiTableColumnFlags_WidthFixed, 40.0f);
-        ImGui::TableSetupColumn("State", ImGuiTableColumnFlags_WidthFixed, 75.0f);
-        ImGui::TableHeadersRow();
+        ImGui::Separator();
+        if (!wizard_vault_weekly_error.empty())
+            ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.2f, 1.0f), "%s", wizard_vault_weekly_error.c_str());
+        else if (wizard_vault_weekly.empty())
+            ImGui::TextDisabled("No weekly objective data. Click Refresh to load it.");
 
-        for (const auto &objective : wizard_vault_weekly)
+        constexpr ImGuiTableFlags vault_flags = ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable;
+        if (!wizard_vault_weekly.empty() && ImGui::BeginTable("WizardVaultWeeklyTable", 5, vault_flags))
         {
-            const auto complete = objective.progress_complete > 0 && objective.progress_current >= objective.progress_complete;
-            const auto color = objective.claimed ? ImVec4(0.4f, 1.0f, 0.4f, 1.0f)
-                                                 : complete ? ImVec4(1.0f, 0.85f, 0.4f, 1.0f)
-                                                            : ImVec4(0.8f, 0.8f, 0.8f, 1.0f);
-            ImGui::TableNextRow();
-            ImGui::TableNextColumn();
-            ImGui::TextColored(color, "%s", objective.title.c_str());
-            ImGui::TableNextColumn();
-            ImGui::TextUnformatted(objective.track.c_str());
-            ImGui::TableNextColumn();
-            ImGui::Text("%d/%d", objective.progress_current, objective.progress_complete);
-            ImGui::TableNextColumn();
-            ImGui::Text("%d", objective.acclaim);
-            ImGui::TableNextColumn();
-            ImGui::TextColored(color, "%s", objective.claimed ? "Claimed" : complete ? "Ready" : "In progress");
-        }
+            ImGui::TableSetupColumn("Objective", ImGuiTableColumnFlags_WidthStretch);
+            ImGui::TableSetupColumn("Track", ImGuiTableColumnFlags_WidthFixed, 55.0f);
+            ImGui::TableSetupColumn("Progress", ImGuiTableColumnFlags_WidthFixed, 75.0f);
+            ImGui::TableSetupColumn("AA", ImGuiTableColumnFlags_WidthFixed, 40.0f);
+            ImGui::TableSetupColumn("State", ImGuiTableColumnFlags_WidthFixed, 75.0f);
+            ImGui::TableHeadersRow();
 
-        ImGui::EndTable();
+            for (const auto &objective : wizard_vault_weekly)
+            {
+                const auto complete = objective.progress_complete > 0 && objective.progress_current >= objective.progress_complete;
+                const auto color = objective.claimed ? ImVec4(0.4f, 1.0f, 0.4f, 1.0f)
+                                                     : complete ? ImVec4(1.0f, 0.85f, 0.4f, 1.0f)
+                                                                : ImVec4(0.8f, 0.8f, 0.8f, 1.0f);
+                ImGui::TableNextRow();
+                ImGui::TableNextColumn();
+                ImGui::TextColored(color, "%s", objective.title.c_str());
+                ImGui::TableNextColumn();
+                ImGui::TextUnformatted(objective.track.c_str());
+                ImGui::TableNextColumn();
+                ImGui::Text("%d/%d", objective.progress_current, objective.progress_complete);
+                ImGui::TableNextColumn();
+                ImGui::Text("%d", objective.acclaim);
+                ImGui::TableNextColumn();
+                ImGui::TextColored(color, "%s", objective.claimed ? "Claimed" : complete ? "Ready" : "In progress");
+            }
+
+            ImGui::EndTable();
+        }
     }
 
+    const auto current_daily_bounties = current_daily_raid_bounties();
     const auto strike_is_cleared = [&](const StrikeEncounterDefinition &encounter)
     {
         return std::any_of(cleared_raid_events.begin(), cleared_raid_events.end(), [&](const std::string &event_id)
                            { return strike_encounter_id_matches(event_id, encounter); });
     };
+    const auto strike_is_daily = [&](const StrikeEncounterDefinition &encounter)
+    {
+        return std::any_of(current_daily_bounties.begin(), current_daily_bounties.end(), [&](const DailyRaidBounty bounty)
+                           { return raid_event_matches_bounty(encounter.id, bounty); });
+    };
     const auto render_strike_category = [&](const char *name, const auto &encounters)
     {
         const auto done_count = std::count_if(encounters.begin(), encounters.end(), strike_is_cleared);
+        const auto has_daily = std::any_of(encounters.begin(), encounters.end(), strike_is_daily);
         const auto header = std::string(name) + " (" + std::to_string(done_count) + "/" +
                             std::to_string(encounters.size()) + ")###strike_" + name;
-        if (!ImGui::CollapsingHeader(header.c_str()))
+        if (has_daily)
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.85f, 0.4f, 1.0f));
+        const auto expanded = ImGui::CollapsingHeader(header.c_str());
+        if (has_daily)
+            ImGui::PopStyleColor();
+        if (!expanded)
             return;
 
         for (const auto &encounter : encounters)
         {
             const auto done = strike_is_cleared(encounter);
-            ImGui::TextColored(done ? ImVec4(0.4f, 1.0f, 0.4f, 1.0f) : ImVec4(0.6f, 0.6f, 0.6f, 1.0f),
+            const auto daily = strike_is_daily(encounter);
+            ImGui::TextColored(daily ? ImVec4(1.0f, 0.85f, 0.4f, 1.0f)
+                                     : done ? ImVec4(0.4f, 1.0f, 0.4f, 1.0f)
+                                            : ImVec4(0.6f, 0.6f, 0.6f, 1.0f),
                                "%s %s", done ? "[x]" : "[ ]", encounter.name);
         }
     };
@@ -1352,7 +1375,6 @@ void Render::weekly_child()
     ImGui::Spacing();
     ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.4f, 1.0f), "Raids (weekly reset)");
     ImGui::Separator();
-    const auto current_daily_bounties = current_daily_raid_bounties();
     const auto event_is_daily = [&](const RaidEvent &event)
     {
         return std::any_of(current_daily_bounties.begin(), current_daily_bounties.end(), [&](const DailyRaidBounty bounty)
