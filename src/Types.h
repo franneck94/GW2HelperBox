@@ -182,6 +182,19 @@ struct RaidWing
 };
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(RaidWing, id, events)
 
+struct WizardVaultObjective
+{
+    int id = 0;
+    std::string title;
+    std::string track;
+    int acclaim = 0;
+    int progress_current = 0;
+    int progress_complete = 0;
+    bool claimed = false;
+};
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(WizardVaultObjective, id, title, track, acclaim,
+                                                progress_current, progress_complete, claimed)
+
 struct CompletionCache
 {
     std::vector<RaidWing> raid_wings;
@@ -190,9 +203,11 @@ struct CompletionCache
     std::set<std::string> cleared_raid_events;
     std::set<std::string> cleared_dungeon_paths;
     std::set<std::string> killed_world_bosses;
+    std::vector<WizardVaultObjective> wizard_vault_weekly;
 };
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(CompletionCache, raid_wings, dungeon_defs, world_bosses,
-                                   cleared_raid_events, cleared_dungeon_paths, killed_world_bosses)
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(CompletionCache, raid_wings, dungeon_defs, world_bosses,
+                                                cleared_raid_events, cleared_dungeon_paths, killed_world_bosses,
+                                                wizard_vault_weekly)
 
 struct OutdatedOrderNotification
 {
