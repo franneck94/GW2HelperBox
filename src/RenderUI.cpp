@@ -612,7 +612,8 @@ void RenderUI::render_krait_materials_calculator()
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4.0f, 4.0f));
 
     const auto available_width = ImGui::GetContentRegionAvail().x;
-    const auto child_height = ImGui::GetWindowHeight() * 0.5f;
+    const auto child_height = ImGui::GetTextLineHeightWithSpacing() * 11.0f +
+                              ImGui::GetStyle().WindowPadding.y * 2.0f;
 
     ImGui::BeginChild("KraitShieldCalculator", ImVec2(available_width, child_height), false);
     render_item("Krait Shield Materials", "krait-shield", &num_shields, 10, 4);
@@ -655,8 +656,10 @@ void RenderUI::render_gem_gold_calculator()
                     const auto gold = quantity / 10000;
                     const auto silver = (quantity % 10000) / 100;
                     const auto rest = quantity % 100;
+                    char gold_per_gem[32];
+                    snprintf(gold_per_gem, sizeof(gold_per_gem), "%.4f", per_gem / 10000.0);
                     result = std::to_string(gold) + "g " + std::to_string(silver) + "s " + std::to_string(rest) +
-                             "c  (" + std::to_string(per_gem) + " copper/gem)";
+                             "c  (" + gold_per_gem + " gold/gem)";
                 }
             }
             else
