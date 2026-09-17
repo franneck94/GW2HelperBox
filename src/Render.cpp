@@ -61,6 +61,179 @@ namespace
         "camp",
     };
 
+    constexpr std::array<const char *, static_cast<std::size_t>(DailyRaidBounty::Count)> DAILY_RAID_BOUNTY_NAMES = {
+        "Shiverpeaks Pass",
+        "Voice and Claw of the Fallen",
+        "Fraenir of Jormag",
+        "Gorseval",
+        "Cairn",
+        "Mursaat Overseer",
+        "Aetherblade Hideout",
+        "Cardinal Sabir",
+        "Whisper of Jormag",
+        "Vale Guardian",
+        "Cosmic Observatory",
+        "Cold War",
+        "Boneskinner",
+        "Sabetha",
+        "Xunlai Jade Junkyard",
+        "Temple of Febe",
+        "Keep Construct",
+        "Kela",
+        "Slothasor",
+        "Matthias",
+        "Xera",
+        "Samarog",
+        "Conjured Amalgamate",
+        "Twin Largos",
+        "Decima",
+        "Cardinal Adina",
+        "Old Lion's Court",
+        "Ura",
+        "Kaineng Overlook",
+        "Deimos",
+        "Qadim",
+        "Qadim the Peerless",
+        "Soulless Horror",
+        "Harvest Temple",
+        "Dhuum",
+        "Greer",
+    };
+
+    constexpr std::array BOSS_1_DAILY_ROTATION = {
+        DailyRaidBounty::ShiverpeaksPass,
+        DailyRaidBounty::VoiceAndClawOfTheFallen,
+        DailyRaidBounty::FraenirOfJormag,
+        DailyRaidBounty::Gorseval,
+        DailyRaidBounty::Cairn,
+        DailyRaidBounty::MursaatOverseer,
+    };
+
+    constexpr std::array BOSS_2_DAILY_ROTATION = {
+        DailyRaidBounty::AetherbladeHideout,
+        DailyRaidBounty::CardinalSabir,
+        DailyRaidBounty::WhisperOfJormag,
+        DailyRaidBounty::ValeGuardian,
+        DailyRaidBounty::CosmicObservatory,
+        DailyRaidBounty::ColdWar,
+        DailyRaidBounty::Boneskinner,
+        DailyRaidBounty::Sabetha,
+        DailyRaidBounty::XunlaiJadeJunkyard,
+        DailyRaidBounty::TempleOfFebe,
+        DailyRaidBounty::KeepConstruct,
+        DailyRaidBounty::Kela,
+    };
+
+    constexpr std::array BOSS_3_DAILY_ROTATION = {
+        DailyRaidBounty::Slothasor,
+        DailyRaidBounty::Matthias,
+        DailyRaidBounty::Xera,
+        DailyRaidBounty::Samarog,
+        DailyRaidBounty::ConjuredAmalgamate,
+        DailyRaidBounty::TwinLargos,
+        DailyRaidBounty::Decima,
+        DailyRaidBounty::CardinalAdina,
+        DailyRaidBounty::OldLionsCourt,
+        DailyRaidBounty::Ura,
+        DailyRaidBounty::KainengOverlook,
+        DailyRaidBounty::Deimos,
+    };
+
+    constexpr std::array BOSS_4_DAILY_ROTATION = {
+        DailyRaidBounty::Qadim,
+        DailyRaidBounty::QadimThePeerless,
+        DailyRaidBounty::SoullessHorror,
+        DailyRaidBounty::HarvestTemple,
+        DailyRaidBounty::Dhuum,
+        DailyRaidBounty::Greer,
+    };
+
+    constexpr const char *daily_raid_bounty_name(DailyRaidBounty bounty)
+    {
+        return DAILY_RAID_BOUNTY_NAMES[static_cast<std::size_t>(bounty)];
+    }
+
+    std::size_t current_daily_raid_rotation_index()
+    {
+        constexpr auto anchor_date = std::chrono::sys_days{
+            std::chrono::year{2026} / std::chrono::month{9} / std::chrono::day{17}};
+        constexpr auto anchor_index = 8LL;
+        constexpr auto cycle_length = static_cast<long long>(BOSS_2_DAILY_ROTATION.size());
+
+        const auto today = std::chrono::floor<std::chrono::days>(std::chrono::system_clock::now());
+        const auto elapsed_days = (today - anchor_date).count();
+        const auto index = (elapsed_days + anchor_index) % cycle_length;
+        return static_cast<std::size_t>(index < 0 ? index + cycle_length : index);
+    }
+
+    void render_daily_raid_rotations()
+    {
+        const auto rotation_index = current_daily_raid_rotation_index();
+        const std::array current_bounties = {
+            BOSS_1_DAILY_ROTATION[rotation_index % BOSS_1_DAILY_ROTATION.size()],
+            BOSS_2_DAILY_ROTATION[rotation_index],
+            BOSS_3_DAILY_ROTATION[rotation_index],
+            BOSS_4_DAILY_ROTATION[rotation_index % BOSS_4_DAILY_ROTATION.size()],
+        };
+
+        ImGui::Spacing();
+        ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.4f, 1.0f), "Today's Raid Bounties (UTC reset)");
+        constexpr ImGuiTableFlags flags = ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg;
+        if (ImGui::BeginTable("CurrentDailyRaidBountiesTable", 4, flags))
+        {
+            ImGui::TableSetupColumn("Boss 1", ImGuiTableColumnFlags_WidthStretch);
+            ImGui::TableSetupColumn("Boss 2", ImGuiTableColumnFlags_WidthStretch);
+            ImGui::TableSetupColumn("Boss 3", ImGuiTableColumnFlags_WidthStretch);
+            ImGui::TableSetupColumn("Boss 4", ImGuiTableColumnFlags_WidthStretch);
+            ImGui::TableHeadersRow();
+            ImGui::TableNextRow();
+            for (const auto bounty : current_bounties)
+            {
+                ImGui::TableNextColumn();
+                ImGui::TextWrapped("Raid Bounty: %s", daily_raid_bounty_name(bounty));
+            }
+            ImGui::EndTable();
+        }
+
+        ImGui::SetNextItemOpen(false, ImGuiCond_Once);
+        if (!ImGui::CollapsingHeader("Full Daily Raid Bounty Rotation"))
+            return;
+
+        if (!ImGui::BeginTable("DailyRaidBountyRotationTable", 4, flags))
+            return;
+
+        ImGui::TableSetupColumn("Boss 1", ImGuiTableColumnFlags_WidthStretch);
+        ImGui::TableSetupColumn("Boss 2", ImGuiTableColumnFlags_WidthStretch);
+        ImGui::TableSetupColumn("Boss 3", ImGuiTableColumnFlags_WidthStretch);
+        ImGui::TableSetupColumn("Boss 4", ImGuiTableColumnFlags_WidthStretch);
+        ImGui::TableHeadersRow();
+
+        const auto render_cell = [](const auto &rotation, std::size_t row, DailyRaidBounty current)
+        {
+            ImGui::TableNextColumn();
+            if (row < rotation.size())
+            {
+                const auto selected = rotation[row] == current;
+                if (selected)
+                    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.4f, 1.0f, 0.4f, 1.0f));
+                ImGui::TextWrapped("%zu. Raid Bounty: %s", row + 1, daily_raid_bounty_name(rotation[row]));
+                if (selected)
+                    ImGui::PopStyleColor();
+            }
+        };
+
+        for (std::size_t row = 0; row < BOSS_2_DAILY_ROTATION.size(); ++row)
+        {
+            ImGui::TableNextRow();
+            render_cell(BOSS_1_DAILY_ROTATION, row, current_bounties[0]);
+            render_cell(BOSS_2_DAILY_ROTATION, row, current_bounties[1]);
+            render_cell(BOSS_3_DAILY_ROTATION, row, current_bounties[2]);
+            render_cell(BOSS_4_DAILY_ROTATION, row, current_bounties[3]);
+        }
+
+        ImGui::EndTable();
+    }
+
     bool copied_name_popup_requested = false;
     auto copied_name_until = std::chrono::steady_clock::now();
 
@@ -1003,6 +1176,8 @@ void Render::weekly_child()
         }
     }
 
+    render_daily_raid_rotations();
+
     render_group("Dungeons (daily reset)", dungeon_defs, cleared_dungeon_paths, "dungeon_");
 
     ImGui::Spacing();
@@ -1156,9 +1331,14 @@ void Render::characters_child()
         missing_inventory_scope = missing_inventory_scope || !info.has_inventory;
     }
 
+    const auto deaths_per_hour = [](long long deaths, long long age_seconds)
+    {
+        return age_seconds > 0 ? static_cast<double>(deaths) * 3600.0 / static_cast<double>(age_seconds) : 0.0;
+    };
+
     ImGui::Spacing();
-    ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.4f, 1.0f), "%zu characters | %lldh played | %lld deaths",
-                       characters.size(), total_age / 3600, total_deaths);
+    ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.4f, 1.0f), "%zu characters | %lldh played | %lld deaths | %.2f deaths/h",
+                       characters.size(), total_age / 3600, total_deaths, deaths_per_hour(total_deaths, total_age));
 
     if (missing_inventory_scope)
         ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.2f, 1.0f),
@@ -1169,7 +1349,7 @@ void Render::characters_child()
     constexpr ImGuiTableFlags flags = ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
                                       ImGuiTableFlags_Resizable | ImGuiTableFlags_Sortable |
                                       ImGuiTableFlags_ScrollY;
-    if (!ImGui::BeginTable("CharactersTable", 8, flags, ImVec2(0.0f, 400.0f)))
+    if (!ImGui::BeginTable("CharactersTable", 9, flags, ImVec2(0.0f, 400.0f)))
         return;
 
     ImGui::TableSetupScrollFreeze(0, 1);
@@ -1180,7 +1360,8 @@ void Render::characters_child()
     ImGui::TableSetupColumn("Played", ImGuiTableColumnFlags_WidthFixed, 90.0f, 4);
     ImGui::TableSetupColumn("Created", ImGuiTableColumnFlags_WidthFixed, 90.0f, 5);
     ImGui::TableSetupColumn("Deaths", ImGuiTableColumnFlags_WidthFixed, 60.0f, 6);
-    ImGui::TableSetupColumn("Slots", ImGuiTableColumnFlags_WidthFixed, 50.0f, 7);
+    ImGui::TableSetupColumn("Deaths/h", ImGuiTableColumnFlags_WidthFixed, 70.0f, 7);
+    ImGui::TableSetupColumn("Slots", ImGuiTableColumnFlags_WidthFixed, 50.0f, 8);
     ImGui::TableHeadersRow();
 
     if (auto *sort_specs = ImGui::TableGetSortSpecs();
@@ -1204,6 +1385,8 @@ void Render::characters_child()
             case 6:
                 return lhs.deaths < rhs.deaths;
             case 7:
+                return deaths_per_hour(lhs.deaths, lhs.age_seconds) < deaths_per_hour(rhs.deaths, rhs.age_seconds);
+            case 8:
                 return lhs.inventory_slots < rhs.inventory_slots;
             default:
                 return lhs.name < rhs.name;
@@ -1241,6 +1424,12 @@ void Render::characters_child()
 
         ImGui::TableNextColumn();
         ImGui::Text("%d", info.deaths);
+
+        ImGui::TableNextColumn();
+        if (info.age_seconds > 0)
+            ImGui::Text("%.2f", deaths_per_hour(info.deaths, info.age_seconds));
+        else
+            ImGui::TextDisabled("-");
 
         ImGui::TableNextColumn();
         if (info.has_inventory)
@@ -1653,13 +1842,31 @@ void Render::collections_child()
         (entry.has_any_price ? priced : no_price).push_back(std::move(entry));
     }
 
-    std::stable_sort(priced.begin(), priced.end(),
-                     [this](const LockedCollection &lhs, const LockedCollection &rhs)
-                     {
-                         return collections_sort_ascending
-                                    ? lhs.total_instant_buy < rhs.total_instant_buy
-                                    : lhs.total_instant_buy > rhs.total_instant_buy;
-                     });
+    const auto sort_value = [this](const LockedCollection &entry) -> long long
+    {
+        switch (collection_sort)
+        {
+        case CollectionSort::BuyOrder:
+            return entry.total_buy_order;
+        case CollectionSort::ItemsNeeded:
+            return static_cast<long long>(entry.rows.size());
+        case CollectionSort::InstantBuy:
+        default:
+            return entry.total_instant_buy;
+        }
+    };
+    const auto sort_collections = [&](auto &collections)
+    {
+        std::stable_sort(collections.begin(), collections.end(),
+                         [&](const LockedCollection &lhs, const LockedCollection &rhs)
+                         {
+                             return collections_sort_ascending
+                                        ? sort_value(lhs) < sort_value(rhs)
+                                        : sort_value(lhs) > sort_value(rhs);
+                         });
+    };
+    sort_collections(priced);
+    sort_collections(no_price);
 
     const auto coins_str = [](long long copper)
     {
@@ -1747,11 +1954,34 @@ void Render::collections_child()
     ImGui::SameLine();
     ImGui::TextUnformatted("Sort:");
     ImGui::SameLine();
-    ImGui::SetNextItemWidth(160.0f);
-    const char *sort_labels[] = {"Price ascending", "Price descending"};
-    int sort_index = collections_sort_ascending ? 0 : 1;
-    if (ImGui::Combo("##CollectionsSort", &sort_index, sort_labels, IM_ARRAYSIZE(sort_labels)))
-        collections_sort_ascending = (sort_index == 0);
+    ImGui::SetNextItemWidth(130.0f);
+    constexpr std::array sort_options = {
+        std::pair{CollectionSort::InstantBuy, "Insta buy"},
+        std::pair{CollectionSort::BuyOrder, "Order"},
+        std::pair{CollectionSort::ItemsNeeded, "Items needed"},
+    };
+    const auto selected_sort = std::find_if(sort_options.begin(), sort_options.end(),
+                                            [this](const auto &option)
+                                            { return option.first == collection_sort; });
+    const auto *sort_preview = selected_sort != sort_options.end() ? selected_sort->second : "Insta buy";
+    if (ImGui::BeginCombo("##CollectionsSort", sort_preview))
+    {
+        for (const auto &[sort, label] : sort_options)
+        {
+            const auto selected = collection_sort == sort;
+            if (ImGui::Selectable(label, selected))
+                collection_sort = sort;
+            if (selected)
+                ImGui::SetItemDefaultFocus();
+        }
+        ImGui::EndCombo();
+    }
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(100.0f);
+    const char *direction_labels[] = {"Ascending", "Descending"};
+    auto direction_index = collections_sort_ascending ? 0 : 1;
+    if (ImGui::Combo("##CollectionsSortDirection", &direction_index, direction_labels, IM_ARRAYSIZE(direction_labels)))
+        collections_sort_ascending = direction_index == 0;
 
     ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.4f, 1.0f), "All open collections  Order: %s | Insta: %s",
                        coins_str(grand_total_buy_order).c_str(), coins_str(grand_total_instant_buy).c_str());
@@ -2481,15 +2711,26 @@ void Render::calculators_child()
 
     ImGui::BeginChild("CalculatorsContent", ImVec2(window_width, -1.0), false, ImGuiWindowFlags_AlwaysAutoResize);
 
+    const auto available_width = ImGui::GetContentRegionAvail().x;
+    const auto item_spacing = ImGui::GetStyle().ItemSpacing.x;
+    const auto side_by_side = available_width >= 688.0f;
+    const auto child_width = side_by_side ? (available_width - item_spacing) * 0.5f : available_width;
+
+    ImGui::BeginChild("ProfitCalculator", ImVec2(child_width, 170.0f), false);
     RenderUI::render_profit_calculator();
+    ImGui::EndChild();
+
+    if (side_by_side)
+        ImGui::SameLine();
+
+    ImGui::BeginChild("GemExchangeCalculator", ImVec2(child_width, 170.0f), false);
+    RenderUI::render_gem_gold_calculator();
+    ImGui::EndChild();
+
     ImGui::Spacing();
     ImGui::Separator();
     ImGui::Spacing();
     RenderUI::render_krait_materials_calculator();
-    ImGui::Spacing();
-    ImGui::Separator();
-    ImGui::Spacing();
-    RenderUI::render_gem_gold_calculator();
 
     ImGui::EndChild();
 }
