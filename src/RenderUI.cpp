@@ -649,15 +649,15 @@ void RenderUI::render_gem_gold_calculator()
             {
                 const long long quantity = j.value("quantity", 0LL);
                 const long long per_gem = j.value("coins_per_gem", 0LL);
+                char gold_per_gem[32];
+                snprintf(gold_per_gem, sizeof(gold_per_gem), "%.4f", per_gem / 10000.0);
                 if (gems_out)
-                    result = std::to_string(quantity) + " gems  (" + std::to_string(per_gem) + " copper/gem)";
+                    result = std::to_string(quantity) + " gems  (" + gold_per_gem + " gold/gem)";
                 else
                 {
                     const auto gold = quantity / 10000;
                     const auto silver = (quantity % 10000) / 100;
                     const auto rest = quantity % 100;
-                    char gold_per_gem[32];
-                    snprintf(gold_per_gem, sizeof(gold_per_gem), "%.4f", per_gem / 10000.0);
                     result = std::to_string(gold) + "g " + std::to_string(silver) + "s " + std::to_string(rest) +
                              "c  (" + gold_per_gem + " gold/gem)";
                 }
