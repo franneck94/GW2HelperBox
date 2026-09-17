@@ -47,6 +47,7 @@ namespace Settings
     extern std::set<std::string> FinishedCollections;
     extern std::vector<SecondaryAccount> SecondaryAPIKeys;
     extern std::map<std::string, CompletionCache> CompletionCaches;
+    extern std::map<std::string, std::vector<CharacterInfo>> CharacterCaches;
 }
 
 #endif
