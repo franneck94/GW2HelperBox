@@ -612,11 +612,21 @@ void RenderUI::render_krait_materials_calculator()
 
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4.0f, 4.0f));
 
+    const auto available_width = ImGui::GetContentRegionAvail().x;
+    const auto item_spacing = ImGui::GetStyle().ItemSpacing.x;
+    const auto side_by_side = available_width >= 688.0f;
+    const auto child_width = side_by_side ? (available_width - item_spacing) * 0.5f : available_width;
+
+    ImGui::BeginChild("KraitShieldCalculator", ImVec2(child_width, 260.0f), false);
     render_item("Krait Shield Materials", "krait-shield", &num_shields, 10, 4);
-    ImGui::Spacing();
-    ImGui::Separator();
-    ImGui::Spacing();
+    ImGui::EndChild();
+
+    if (side_by_side)
+        ImGui::SameLine();
+
+    ImGui::BeginChild("KraitTridentCalculator", ImVec2(child_width, 260.0f), false);
     render_item("Krait Trident Materials", "krait-trident", &num_tridents, 8, 6);
+    ImGui::EndChild();
 
     ImGui::PopStyleVar();
     ImGui::Spacing();
