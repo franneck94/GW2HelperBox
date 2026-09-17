@@ -61,6 +61,60 @@ namespace
         "camp",
     };
 
+    struct StrikeEncounterDefinition
+    {
+        const char *id;
+        const char *name;
+    };
+
+    constexpr std::array IBS5_STRIKE_ENCOUNTERS = {
+        StrikeEncounterDefinition{"icebrood_construct", "Shiverpeaks Pass"},
+        StrikeEncounterDefinition{"voice_and_claw", "Voice and Claw of the Fallen"},
+        StrikeEncounterDefinition{"fraenir_of_jormag", "Fraenir of Jormag"},
+        StrikeEncounterDefinition{"boneskinner", "Boneskinner"},
+        StrikeEncounterDefinition{"whisper_of_jormag", "Whisper of Jormag"},
+    };
+
+    constexpr std::array EOD_STRIKE_ENCOUNTERS = {
+        StrikeEncounterDefinition{"mai_trin", "Aetherblade Hideout"},
+        StrikeEncounterDefinition{"ankka", "Xunlai Jade Junkyard"},
+        StrikeEncounterDefinition{"minister_li", "Kaineng Overlook"},
+        StrikeEncounterDefinition{"the_dragonvoid", "Harvest Temple"},
+    };
+
+    constexpr std::array SOTO_STRIKE_ENCOUNTERS = {
+        StrikeEncounterDefinition{"dagda", "Cosmic Observatory"},
+        StrikeEncounterDefinition{"cerus", "Temple of Febe"},
+    };
+
+    constexpr std::array OTHER_STRIKE_ENCOUNTERS = {
+        StrikeEncounterDefinition{"kela", "Kela"},
+        StrikeEncounterDefinition{"vloxx", "Vloxx"},
+    };
+
+    bool strike_encounter_id_matches(const std::string &event_id, const StrikeEncounterDefinition &encounter)
+    {
+        if (event_id == encounter.id)
+            return true;
+        return std::string(encounter.id) == "the_dragonvoid" && event_id == "dragonvoid";
+    }
+
+    template <std::size_t Size>
+    bool contains_strike_encounter(const std::array<StrikeEncounterDefinition, Size> &encounters,
+                                   const std::string &event_id)
+    {
+        return std::any_of(encounters.begin(), encounters.end(), [&](const StrikeEncounterDefinition &encounter)
+                           { return strike_encounter_id_matches(event_id, encounter); });
+    }
+
+    bool is_weekly_strike_encounter(const std::string &event_id)
+    {
+        return contains_strike_encounter(IBS5_STRIKE_ENCOUNTERS, event_id) ||
+               contains_strike_encounter(EOD_STRIKE_ENCOUNTERS, event_id) ||
+               contains_strike_encounter(SOTO_STRIKE_ENCOUNTERS, event_id) ||
+               contains_strike_encounter(OTHER_STRIKE_ENCOUNTERS, event_id);
+    }
+
     constexpr std::array<const char *, static_cast<std::size_t>(DailyRaidBounty::Count)> DAILY_RAID_BOUNTY_NAMES = {
         "Shiverpeaks Pass",
         "Voice and Claw of the Fallen",
@@ -938,7 +992,9 @@ void Render::weekly_child()
         accounts.emplace_back(account.name, account.api_key);
 
     const auto raid_event_counts = [](const RaidEvent &event)
-    { return !Settings::RaidBossesOnly || event.is_boss; };
+    { return (!Settings::RaidBossesOnly || event.is_boss) && !is_weekly_strike_encounter(event.id); };
+    const auto raid_wing_has_counted_events = [&](const RaidWing &wing)
+    { return std::any_of(wing.events.begin(), wing.events.end(), raid_event_counts); };
     const auto raid_wing_complete = [&](const RaidWing &wing)
     {
         const auto relevant_event = std::find_if(wing.events.begin(), wing.events.end(), raid_event_counts);
@@ -956,8 +1012,10 @@ void Render::weekly_child()
     ImGui::TextUnformatted("Account");
     ImGui::SameLine();
     ImGui::SetNextItemWidth(200.0f);
-    const auto all_raid_wings_complete = weekly_loaded && weekly_error.empty() && !raid_wings.empty() &&
-                                         std::all_of(raid_wings.begin(), raid_wings.end(), raid_wing_complete);
+    const auto all_raid_wings_complete = weekly_loaded && weekly_error.empty() &&
+                                         std::any_of(raid_wings.begin(), raid_wings.end(), raid_wing_has_counted_events) &&
+                                         std::all_of(raid_wings.begin(), raid_wings.end(), [&](const RaidWing &wing)
+                                                     { return !raid_wing_has_counted_events(wing) || raid_wing_complete(wing); });
     if (all_raid_wings_complete)
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.4f, 1.0f, 0.4f, 1.0f));
     const auto account_combo_open = ImGui::BeginCombo("##CompletionsAccount", accounts[completions_account_index].first.c_str());
@@ -985,12 +1043,14 @@ void Render::weekly_child()
         loaded_completions_account_key = selected_key;
         weekly_loaded = false;
         weekly_error.clear();
+        wizard_vault_weekly_error.clear();
         raid_wings.clear();
         dungeon_defs.clear();
         world_bosses.clear();
         cleared_raid_events.clear();
         cleared_dungeon_paths.clear();
         killed_world_bosses.clear();
+        wizard_vault_weekly.clear();
 
         const auto cached = Settings::CompletionCaches.find(selected_key);
         if (cached != Settings::CompletionCaches.end())
@@ -1001,6 +1061,7 @@ void Render::weekly_child()
             cleared_raid_events = cached->second.cleared_raid_events;
             cleared_dungeon_paths = cached->second.cleared_dungeon_paths;
             killed_world_bosses = cached->second.killed_world_bosses;
+            wizard_vault_weekly = cached->second.wizard_vault_weekly;
             weekly_loaded = true;
         }
     }
@@ -1020,20 +1081,24 @@ void Render::weekly_child()
         account_raids_future = HTTPClient::GetRequestAsync(L"https://api.guildwars2.com/v2/account/raids?access_token=" + token);
         account_dungeons_future = HTTPClient::GetRequestAsync(L"https://api.guildwars2.com/v2/account/dungeons?access_token=" + token);
         account_worldbosses_future = HTTPClient::GetRequestAsync(L"https://api.guildwars2.com/v2/account/worldbosses?access_token=" + token);
+        wizard_vault_weekly_future = HTTPClient::GetRequestAsync(L"https://api.guildwars2.com/v2/account/wizardsvault/weekly?access_token=" + token);
         weekly_request_account_key = selected_key;
         weekly_requested = true;
         weekly_error.clear();
+        wizard_vault_weekly_error.clear();
     }
 
     if (weekly_requested && raids_def_future.has_value() && dungeons_def_future.has_value() &&
         worldbosses_def_future.has_value() && account_raids_future.has_value() &&
-        account_dungeons_future.has_value() && account_worldbosses_future.has_value())
+        account_dungeons_future.has_value() && account_worldbosses_future.has_value() &&
+        wizard_vault_weekly_future.has_value())
     {
         const auto ready = [](std::optional<std::future<std::string>> &f)
         { return f->wait_for(std::chrono::seconds(0)) == std::future_status::ready; };
 
         if (ready(raids_def_future) && ready(dungeons_def_future) && ready(worldbosses_def_future) &&
-            ready(account_raids_future) && ready(account_dungeons_future) && ready(account_worldbosses_future))
+            ready(account_raids_future) && ready(account_dungeons_future) && ready(account_worldbosses_future) &&
+            ready(wizard_vault_weekly_future))
         {
             try
             {
@@ -1087,6 +1152,30 @@ void Render::weekly_child()
                 else if (acc_worldbosses.contains("text") && refresh_error.empty())
                     refresh_error = acc_worldbosses["text"].get<std::string>();
 
+                const auto vault_weekly = json::parse(wizard_vault_weekly_future->get());
+                if (vault_weekly.is_object() && vault_weekly.contains("objectives") && vault_weekly["objectives"].is_array())
+                {
+                    for (const auto &objective : vault_weekly["objectives"])
+                    {
+                        refreshed.wizard_vault_weekly.push_back(WizardVaultObjective{
+                            .id = objective.value("id", 0),
+                            .title = objective.value("title", std::string{}),
+                            .track = objective.value("track", std::string{}),
+                            .acclaim = objective.value("acclaim", 0),
+                            .progress_current = objective.value("progress_current", 0),
+                            .progress_complete = objective.value("progress_complete", 0),
+                            .claimed = objective.value("claimed", false),
+                        });
+                    }
+                }
+                else
+                {
+                    wizard_vault_weekly_error = vault_weekly.value("text", "Unexpected Wizard's Vault response.");
+                    const auto cached = Settings::CompletionCaches.find(weekly_request_account_key);
+                    if (cached != Settings::CompletionCaches.end())
+                        refreshed.wizard_vault_weekly = cached->second.wizard_vault_weekly;
+                }
+
                 if (refresh_error.empty())
                 {
                     Settings::CompletionCaches[weekly_request_account_key] = refreshed;
@@ -1100,6 +1189,7 @@ void Render::weekly_child()
                         cleared_raid_events = std::move(refreshed.cleared_raid_events);
                         cleared_dungeon_paths = std::move(refreshed.cleared_dungeon_paths);
                         killed_world_bosses = std::move(refreshed.killed_world_bosses);
+                        wizard_vault_weekly = std::move(refreshed.wizard_vault_weekly);
                         weekly_loaded = true;
                     }
                 }
@@ -1118,6 +1208,7 @@ void Render::weekly_child()
             account_raids_future.reset();
             account_dungeons_future.reset();
             account_worldbosses_future.reset();
+            wizard_vault_weekly_future.reset();
             weekly_requested = false;
             weekly_request_account_key.clear();
         }
@@ -1185,6 +1276,80 @@ void Render::weekly_child()
     };
 
     ImGui::Spacing();
+    const auto vault_completed = std::count_if(wizard_vault_weekly.begin(), wizard_vault_weekly.end(), [](const WizardVaultObjective &objective)
+                                               { return objective.progress_complete > 0 && objective.progress_current >= objective.progress_complete; });
+    const auto vault_claimed = std::count_if(wizard_vault_weekly.begin(), wizard_vault_weekly.end(), [](const WizardVaultObjective &objective)
+                                             { return objective.claimed; });
+    ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.4f, 1.0f), "Wizard's Vault Weekly (%zu/%zu complete, %zu claimed)",
+                       vault_completed, wizard_vault_weekly.size(), vault_claimed);
+    ImGui::Separator();
+    if (!wizard_vault_weekly_error.empty())
+        ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.2f, 1.0f), "%s", wizard_vault_weekly_error.c_str());
+    else if (wizard_vault_weekly.empty())
+        ImGui::TextDisabled("No weekly objective data. Click Refresh to load it.");
+
+    constexpr ImGuiTableFlags vault_flags = ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable;
+    if (!wizard_vault_weekly.empty() && ImGui::BeginTable("WizardVaultWeeklyTable", 5, vault_flags))
+    {
+        ImGui::TableSetupColumn("Objective", ImGuiTableColumnFlags_WidthStretch);
+        ImGui::TableSetupColumn("Track", ImGuiTableColumnFlags_WidthFixed, 55.0f);
+        ImGui::TableSetupColumn("Progress", ImGuiTableColumnFlags_WidthFixed, 75.0f);
+        ImGui::TableSetupColumn("AA", ImGuiTableColumnFlags_WidthFixed, 40.0f);
+        ImGui::TableSetupColumn("State", ImGuiTableColumnFlags_WidthFixed, 75.0f);
+        ImGui::TableHeadersRow();
+
+        for (const auto &objective : wizard_vault_weekly)
+        {
+            const auto complete = objective.progress_complete > 0 && objective.progress_current >= objective.progress_complete;
+            const auto color = objective.claimed ? ImVec4(0.4f, 1.0f, 0.4f, 1.0f)
+                                                 : complete ? ImVec4(1.0f, 0.85f, 0.4f, 1.0f)
+                                                            : ImVec4(0.8f, 0.8f, 0.8f, 1.0f);
+            ImGui::TableNextRow();
+            ImGui::TableNextColumn();
+            ImGui::TextColored(color, "%s", objective.title.c_str());
+            ImGui::TableNextColumn();
+            ImGui::TextUnformatted(objective.track.c_str());
+            ImGui::TableNextColumn();
+            ImGui::Text("%d/%d", objective.progress_current, objective.progress_complete);
+            ImGui::TableNextColumn();
+            ImGui::Text("%d", objective.acclaim);
+            ImGui::TableNextColumn();
+            ImGui::TextColored(color, "%s", objective.claimed ? "Claimed" : complete ? "Ready" : "In progress");
+        }
+
+        ImGui::EndTable();
+    }
+
+    const auto strike_is_cleared = [&](const StrikeEncounterDefinition &encounter)
+    {
+        return std::any_of(cleared_raid_events.begin(), cleared_raid_events.end(), [&](const std::string &event_id)
+                           { return strike_encounter_id_matches(event_id, encounter); });
+    };
+    const auto render_strike_category = [&](const char *name, const auto &encounters)
+    {
+        const auto done_count = std::count_if(encounters.begin(), encounters.end(), strike_is_cleared);
+        const auto header = std::string(name) + " (" + std::to_string(done_count) + "/" +
+                            std::to_string(encounters.size()) + ")###strike_" + name;
+        if (!ImGui::CollapsingHeader(header.c_str()))
+            return;
+
+        for (const auto &encounter : encounters)
+        {
+            const auto done = strike_is_cleared(encounter);
+            ImGui::TextColored(done ? ImVec4(0.4f, 1.0f, 0.4f, 1.0f) : ImVec4(0.6f, 0.6f, 0.6f, 1.0f),
+                               "%s %s", done ? "[x]" : "[ ]", encounter.name);
+        }
+    };
+
+    ImGui::Spacing();
+    ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.4f, 1.0f), "Strike Raid Encounters (weekly reset)");
+    ImGui::Separator();
+    render_strike_category("IBS5", IBS5_STRIKE_ENCOUNTERS);
+    render_strike_category("EOD", EOD_STRIKE_ENCOUNTERS);
+    render_strike_category("SOTO", SOTO_STRIKE_ENCOUNTERS);
+    render_strike_category("Others", OTHER_STRIKE_ENCOUNTERS);
+
+    ImGui::Spacing();
     ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.4f, 1.0f), "Raids (weekly reset)");
     ImGui::Separator();
     const auto current_daily_bounties = current_daily_raid_bounties();
@@ -1205,6 +1370,9 @@ void Render::weekly_child()
             if (cleared_raid_events.count(event.id) > 0)
                 ++done_count;
         }
+
+        if (event_count == 0)
+            continue;
 
         const auto complete = raid_wing_complete(wing);
         const auto daily = std::any_of(wing.events.begin(), wing.events.end(), event_is_daily);
@@ -1283,6 +1451,14 @@ void Render::characters_child()
     }
 
     const auto &selected_key = accounts[characters_account_index].second;
+    const auto request_characters = [&]()
+    {
+        const auto url = L"https://api.guildwars2.com/v2/characters?ids=all&access_token=" +
+                         std::wstring(selected_key.begin(), selected_key.end());
+        characters_future = HTTPClient::GetRequestAsync(url);
+        characters_requested = true;
+        characters_error.clear();
+    };
 
     if (loaded_characters_account_key != selected_key)
     {
@@ -1299,6 +1475,8 @@ void Render::characters_child()
             characters = cached->second;
             characters_loaded = true;
         }
+        else if (!selected_key.empty())
+            request_characters();
     }
 
     if (selected_key.empty())
@@ -1308,13 +1486,7 @@ void Render::characters_child()
     }
 
     if (ImGui::Button("Refresh") && !characters_requested)
-    {
-        const auto url = L"https://api.guildwars2.com/v2/characters?ids=all&access_token=" +
-                         std::wstring(selected_key.begin(), selected_key.end());
-        characters_future = HTTPClient::GetRequestAsync(url);
-        characters_requested = true;
-        characters_error.clear();
-    }
+        request_characters();
 
     ImGui::SameLine();
     if (characters_requested)
@@ -1408,7 +1580,7 @@ void Render::characters_child()
     constexpr ImGuiTableFlags flags = ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
                                       ImGuiTableFlags_Resizable | ImGuiTableFlags_Sortable |
                                       ImGuiTableFlags_ScrollX | ImGuiTableFlags_ScrollY;
-    const auto table_width = std::min(ImGui::GetContentRegionAvail().x, 740.0f);
+    const auto table_width = std::min(ImGui::GetContentRegionAvail().x, 1000.0f);
     if (!ImGui::BeginTable("CharactersTable", 9, flags, ImVec2(table_width, 400.0f)))
         return;
 
