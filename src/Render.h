@@ -113,6 +113,8 @@ private:
     std::optional<std::future<std::string>> raids_def_future;
     std::optional<std::future<std::string>> dungeons_def_future;
     std::optional<std::future<std::string>> account_raids_future;
+    std::optional<std::future<std::string>> achievements_def_future;
+    std::optional<std::future<std::string>> account_achievements_future;
     std::optional<std::future<std::string>> account_dungeons_future;
     std::optional<std::future<std::string>> worldbosses_def_future;
     std::optional<std::future<std::string>> account_worldbosses_future;
