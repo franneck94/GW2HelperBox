@@ -166,15 +166,58 @@ namespace
         return static_cast<std::size_t>(index < 0 ? index + cycle_length : index);
     }
 
-    void render_daily_raid_rotations()
+    std::array<DailyRaidBounty, 4> current_daily_raid_bounties()
     {
         const auto rotation_index = current_daily_raid_rotation_index();
-        const std::array current_bounties = {
+        return {
             BOSS_1_DAILY_ROTATION[rotation_index % BOSS_1_DAILY_ROTATION.size()],
             BOSS_2_DAILY_ROTATION[rotation_index],
             BOSS_3_DAILY_ROTATION[rotation_index],
             BOSS_4_DAILY_ROTATION[rotation_index % BOSS_4_DAILY_ROTATION.size()],
         };
+    }
+
+    std::string normalized_raid_name(std::string value)
+    {
+        value.erase(std::remove_if(value.begin(), value.end(), [](const unsigned char c)
+                                   { return !std::isalnum(c); }),
+                    value.end());
+        std::transform(value.begin(), value.end(), value.begin(), [](const unsigned char c)
+                       { return static_cast<char>(std::tolower(c)); });
+        return value;
+    }
+
+    bool raid_event_matches_bounty(const std::string &event_id, const DailyRaidBounty bounty)
+    {
+        if (normalized_raid_name(event_id) == normalized_raid_name(daily_raid_bounty_name(bounty)))
+            return true;
+
+        switch (bounty)
+        {
+        case DailyRaidBounty::ShiverpeaksPass:
+            return event_id == "icebrood_construct";
+        case DailyRaidBounty::VoiceAndClawOfTheFallen:
+            return event_id == "voice_and_claw";
+        case DailyRaidBounty::AetherbladeHideout:
+            return event_id == "mai_trin";
+        case DailyRaidBounty::CosmicObservatory:
+            return event_id == "dagda";
+        case DailyRaidBounty::XunlaiJadeJunkyard:
+            return event_id == "ankka";
+        case DailyRaidBounty::TempleOfFebe:
+            return event_id == "cerus";
+        case DailyRaidBounty::KainengOverlook:
+            return event_id == "minister_li";
+        case DailyRaidBounty::HarvestTemple:
+            return event_id == "the_dragonvoid" || event_id == "dragonvoid";
+        default:
+            return false;
+        }
+    }
+
+    void render_daily_raid_rotations()
+    {
+        const auto current_bounties = current_daily_raid_bounties();
 
         ImGui::Spacing();
         ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.4f, 1.0f), "Today's Raid Bounties (UTC reset)");
@@ -1144,6 +1187,12 @@ void Render::weekly_child()
     ImGui::Spacing();
     ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.4f, 1.0f), "Raids (weekly reset)");
     ImGui::Separator();
+    const auto current_daily_bounties = current_daily_raid_bounties();
+    const auto event_is_daily = [&](const RaidEvent &event)
+    {
+        return std::any_of(current_daily_bounties.begin(), current_daily_bounties.end(), [&](const DailyRaidBounty bounty)
+                           { return raid_event_matches_bounty(event.id, bounty); });
+    };
     for (const auto &wing : raid_wings)
     {
         auto done_count = 0;
@@ -1158,12 +1207,14 @@ void Render::weekly_child()
         }
 
         const auto complete = raid_wing_complete(wing);
+        const auto daily = std::any_of(wing.events.begin(), wing.events.end(), event_is_daily);
         const auto header = pretty(wing.id) + " (" + std::to_string(done_count) + "/" + std::to_string(event_count) +
                             ")###raid_" + wing.id;
-        if (complete)
-            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.4f, 1.0f, 0.4f, 1.0f));
+        if (daily || complete)
+            ImGui::PushStyleColor(ImGuiCol_Text, daily ? ImVec4(1.0f, 0.85f, 0.4f, 1.0f)
+                                                       : ImVec4(0.4f, 1.0f, 0.4f, 1.0f));
         const auto expanded = ImGui::CollapsingHeader(header.c_str());
-        if (complete)
+        if (daily || complete)
             ImGui::PopStyleColor();
         if (!expanded)
             continue;
@@ -1171,7 +1222,10 @@ void Render::weekly_child()
         for (const auto &event : wing.events)
         {
             const auto done = cleared_raid_events.count(event.id) > 0;
-            ImGui::TextColored(done ? ImVec4(0.4f, 1.0f, 0.4f, 1.0f) : ImVec4(0.6f, 0.6f, 0.6f, 1.0f),
+            const auto daily_bounty = event_is_daily(event);
+            ImGui::TextColored(daily_bounty ? ImVec4(1.0f, 0.85f, 0.4f, 1.0f)
+                                            : done ? ImVec4(0.4f, 1.0f, 0.4f, 1.0f)
+                                                   : ImVec4(0.6f, 0.6f, 0.6f, 1.0f),
                                "%s %s", done ? "[x]" : "[ ]", pretty(event.id).c_str());
         }
     }
@@ -1238,6 +1292,13 @@ void Render::characters_child()
         characters_requested = false;
         characters_error.clear();
         characters_future.reset();
+
+        const auto cached = Settings::CharacterCaches.find(selected_key);
+        if (cached != Settings::CharacterCaches.end())
+        {
+            characters = cached->second;
+            characters_loaded = true;
+        }
     }
 
     if (selected_key.empty())
@@ -1246,7 +1307,7 @@ void Render::characters_child()
         return;
     }
 
-    if (!characters_requested && !characters_loaded)
+    if (ImGui::Button("Refresh") && !characters_requested)
     {
         const auto url = L"https://api.guildwars2.com/v2/characters?ids=all&access_token=" +
                          std::wstring(selected_key.begin(), selected_key.end());
@@ -1254,6 +1315,12 @@ void Render::characters_child()
         characters_requested = true;
         characters_error.clear();
     }
+
+    ImGui::SameLine();
+    if (characters_requested)
+        ImGui::TextUnformatted("Loading...");
+    else if (!characters_error.empty())
+        ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "%s", characters_error.c_str());
 
     if (characters_future.has_value() &&
         characters_future->wait_for(std::chrono::seconds(0)) == std::future_status::ready)
@@ -1263,7 +1330,7 @@ void Render::characters_child()
             const auto j = json::parse(characters_future->get());
             if (j.is_array())
             {
-                characters.clear();
+                std::vector<CharacterInfo> refreshed_characters;
                 for (const auto &entry : j)
                 {
                     CharacterInfo info;
@@ -1289,8 +1356,13 @@ void Render::characters_child()
                                                                   craft.value("rating", 0),
                                                                   craft.value("active", false)});
 
-                    characters.push_back(std::move(info));
+                    refreshed_characters.push_back(std::move(info));
                 }
+
+                characters = std::move(refreshed_characters);
+                characters_loaded = true;
+                Settings::CharacterCaches[selected_key] = characters;
+                Settings::Save(Globals::SettingsPath);
             }
             else if (j.contains("text"))
                 characters_error = j["text"].get<std::string>();
@@ -1303,22 +1375,9 @@ void Render::characters_child()
         }
         characters_future.reset();
         characters_requested = false;
-        characters_loaded = true;
     }
 
-    if (ImGui::Button("Refresh") && !characters_requested)
-    {
-        characters.clear();
-        characters_loaded = false;
-    }
-
-    ImGui::SameLine();
-    if (characters_requested)
-        ImGui::TextUnformatted("Loading...");
-    else if (!characters_error.empty())
-        ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "%s", characters_error.c_str());
-
-    if (!characters_loaded || !characters_error.empty())
+    if (!characters_loaded)
         return;
 
     auto total_age = 0LL;
@@ -1348,8 +1407,9 @@ void Render::characters_child()
 
     constexpr ImGuiTableFlags flags = ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
                                       ImGuiTableFlags_Resizable | ImGuiTableFlags_Sortable |
-                                      ImGuiTableFlags_ScrollY;
-    if (!ImGui::BeginTable("CharactersTable", 9, flags, ImVec2(0.0f, 400.0f)))
+                                      ImGuiTableFlags_ScrollX | ImGuiTableFlags_ScrollY;
+    const auto table_width = std::min(ImGui::GetContentRegionAvail().x, 740.0f);
+    if (!ImGui::BeginTable("CharactersTable", 9, flags, ImVec2(table_width, 400.0f)))
         return;
 
     ImGui::TableSetupScrollFreeze(0, 1);
