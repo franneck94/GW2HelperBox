@@ -575,8 +575,7 @@ void RenderUI::render_krait_materials_calculator()
 
         ImGui::Spacing();
 
-        const float table_width = 320.0f;
-        ImGui::SetCursorPosX((window_width - table_width) * 0.5f);
+        const float table_width = ImGui::GetContentRegionAvail().x;
         if (ImGui::BeginTable((std::string("##") + id + "-table").c_str(), 3, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg, ImVec2(table_width, 0.0f)))
         {
             ImGui::TableSetupColumn("Material", ImGuiTableColumnFlags_WidthStretch);
@@ -613,18 +612,13 @@ void RenderUI::render_krait_materials_calculator()
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4.0f, 4.0f));
 
     const auto available_width = ImGui::GetContentRegionAvail().x;
-    const auto item_spacing = ImGui::GetStyle().ItemSpacing.x;
-    const auto side_by_side = available_width >= 688.0f;
-    const auto child_width = side_by_side ? (available_width - item_spacing) * 0.5f : available_width;
+    const auto child_height = ImGui::GetWindowHeight() * 0.5f;
 
-    ImGui::BeginChild("KraitShieldCalculator", ImVec2(child_width, 260.0f), false);
+    ImGui::BeginChild("KraitShieldCalculator", ImVec2(available_width, child_height), false);
     render_item("Krait Shield Materials", "krait-shield", &num_shields, 10, 4);
     ImGui::EndChild();
 
-    if (side_by_side)
-        ImGui::SameLine();
-
-    ImGui::BeginChild("KraitTridentCalculator", ImVec2(child_width, 260.0f), false);
+    ImGui::BeginChild("KraitTridentCalculator", ImVec2(available_width, child_height), false);
     render_item("Krait Trident Materials", "krait-trident", &num_tridents, 8, 6);
     ImGui::EndChild();
 
