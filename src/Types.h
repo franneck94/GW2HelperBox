@@ -124,6 +124,47 @@ struct CharacterInfo
     std::vector<CharacterCrafting> crafting;
 };
 
+enum class DailyRaidBounty
+{
+    ShiverpeaksPass,
+    VoiceAndClawOfTheFallen,
+    FraenirOfJormag,
+    Gorseval,
+    Cairn,
+    MursaatOverseer,
+    AetherbladeHideout,
+    CardinalSabir,
+    WhisperOfJormag,
+    ValeGuardian,
+    CosmicObservatory,
+    ColdWar,
+    Boneskinner,
+    Sabetha,
+    XunlaiJadeJunkyard,
+    TempleOfFebe,
+    KeepConstruct,
+    Kela,
+    Slothasor,
+    Matthias,
+    Xera,
+    Samarog,
+    ConjuredAmalgamate,
+    TwinLargos,
+    Decima,
+    CardinalAdina,
+    OldLionsCourt,
+    Ura,
+    KainengOverlook,
+    Deimos,
+    Qadim,
+    QadimThePeerless,
+    SoullessHorror,
+    HarvestTemple,
+    Dhuum,
+    Greer,
+    Count,
+};
+
 struct RaidEvent
 {
     std::string id;
