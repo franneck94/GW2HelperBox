@@ -241,6 +241,63 @@ namespace
         return value;
     }
 
+    bool achievement_name_matches_strike(const std::string &achievement_name,
+                                         const StrikeEncounterDefinition &encounter)
+    {
+        const auto normalized_name = normalized_raid_name(achievement_name);
+        if (!normalized_name.contains("weekly"))
+            return false;
+
+        if (normalized_name.contains(normalized_raid_name(encounter.name)) ||
+            normalized_name.contains(normalized_raid_name(encounter.id)))
+            return true;
+
+        return std::string(encounter.id) == "voice_and_claw" &&
+               normalized_name.contains("voiceofthefallen") &&
+               normalized_name.contains("clawofthefallen");
+    }
+
+    template <std::size_t Size>
+    void add_completed_strikes(const json &achievement_definitions,
+                               const std::set<int> &completed_repeatable_ids,
+                               const std::array<StrikeEncounterDefinition, Size> &encounters,
+                               std::set<std::string> &cleared_events)
+    {
+        for (const auto &definition : achievement_definitions)
+        {
+            if (completed_repeatable_ids.count(definition.value("id", 0)) == 0)
+                continue;
+
+            const auto flags = definition.value("flags", std::vector<std::string>{});
+            if (std::ranges::find(flags, "Repeatable") == flags.end())
+                continue;
+
+            const auto achievement_name = definition.value("name", std::string{});
+            for (const auto &encounter : encounters)
+                if (achievement_name_matches_strike(achievement_name, encounter))
+                    cleared_events.insert(encounter.id);
+        }
+    }
+
+    void add_completed_strike_achievements(const json &account_achievements,
+                                           const json &achievement_definitions,
+                                           std::set<std::string> &cleared_events)
+    {
+        std::set<int> completed_repeatable_ids;
+        for (const auto &progress : account_achievements)
+            if (progress.value("done", false) && progress.contains("repeated"))
+                completed_repeatable_ids.insert(progress.value("id", 0));
+
+        add_completed_strikes(achievement_definitions, completed_repeatable_ids,
+                              IBS5_STRIKE_ENCOUNTERS, cleared_events);
+        add_completed_strikes(achievement_definitions, completed_repeatable_ids,
+                              EOD_STRIKE_ENCOUNTERS, cleared_events);
+        add_completed_strikes(achievement_definitions, completed_repeatable_ids,
+                              SOTO_STRIKE_ENCOUNTERS, cleared_events);
+        add_completed_strikes(achievement_definitions, completed_repeatable_ids,
+                              OTHER_STRIKE_ENCOUNTERS, cleared_events);
+    }
+
     bool raid_event_matches_bounty(const std::string &event_id, const DailyRaidBounty bounty)
     {
         if (normalized_raid_name(event_id) == normalized_raid_name(daily_raid_bounty_name(bounty)))
@@ -1079,6 +1136,8 @@ void Render::weekly_child()
         dungeons_def_future = HTTPClient::GetRequestAsync(L"https://api.guildwars2.com/v2/dungeons?ids=all");
         worldbosses_def_future = HTTPClient::GetRequestAsync(L"https://api.guildwars2.com/v2/worldbosses");
         account_raids_future = HTTPClient::GetRequestAsync(L"https://api.guildwars2.com/v2/account/raids?access_token=" + token);
+        achievements_def_future = HTTPClient::GetRequestAsync(L"https://api.guildwars2.com/v2/achievements?ids=all");
+        account_achievements_future = HTTPClient::GetRequestAsync(L"https://api.guildwars2.com/v2/account/achievements?access_token=" + token);
         account_dungeons_future = HTTPClient::GetRequestAsync(L"https://api.guildwars2.com/v2/account/dungeons?access_token=" + token);
         account_worldbosses_future = HTTPClient::GetRequestAsync(L"https://api.guildwars2.com/v2/account/worldbosses?access_token=" + token);
         wizard_vault_weekly_future = HTTPClient::GetRequestAsync(L"https://api.guildwars2.com/v2/account/wizardsvault/weekly?access_token=" + token);
@@ -1090,6 +1149,7 @@ void Render::weekly_child()
 
     if (weekly_requested && raids_def_future.has_value() && dungeons_def_future.has_value() &&
         worldbosses_def_future.has_value() && account_raids_future.has_value() &&
+        achievements_def_future.has_value() && account_achievements_future.has_value() &&
         account_dungeons_future.has_value() && account_worldbosses_future.has_value() &&
         wizard_vault_weekly_future.has_value())
     {
@@ -1097,7 +1157,8 @@ void Render::weekly_child()
         { return f->wait_for(std::chrono::seconds(0)) == std::future_status::ready; };
 
         if (ready(raids_def_future) && ready(dungeons_def_future) && ready(worldbosses_def_future) &&
-            ready(account_raids_future) && ready(account_dungeons_future) && ready(account_worldbosses_future) &&
+            ready(account_raids_future) && ready(achievements_def_future) && ready(account_achievements_future) &&
+            ready(account_dungeons_future) && ready(account_worldbosses_future) &&
             ready(wizard_vault_weekly_future))
         {
             try
@@ -1137,6 +1198,21 @@ void Render::weekly_child()
                         refreshed.cleared_raid_events.insert(id.get<std::string>());
                 else if (acc_raids.contains("text"))
                     refresh_error = acc_raids["text"].get<std::string>();
+
+                const auto account_achievements = json::parse(account_achievements_future->get());
+                const auto achievement_definitions = json::parse(achievements_def_future->get());
+                if (account_achievements.is_array() && achievement_definitions.is_array())
+                    add_completed_strike_achievements(account_achievements, achievement_definitions,
+                                                      refreshed.cleared_raid_events);
+                else if (refresh_error.empty())
+                {
+                    if (account_achievements.is_object())
+                        refresh_error = account_achievements.value("text", "Unexpected account achievement response.");
+                    else if (achievement_definitions.is_object())
+                        refresh_error = achievement_definitions.value("text", "Unexpected achievement definition response.");
+                    else
+                        refresh_error = "Unexpected achievement response.";
+                }
 
                 const auto acc_dungeons = json::parse(account_dungeons_future->get());
                 if (acc_dungeons.is_array())
@@ -1206,6 +1282,8 @@ void Render::weekly_child()
             dungeons_def_future.reset();
             worldbosses_def_future.reset();
             account_raids_future.reset();
+            achievements_def_future.reset();
+            account_achievements_future.reset();
             account_dungeons_future.reset();
             account_worldbosses_future.reset();
             wizard_vault_weekly_future.reset();
