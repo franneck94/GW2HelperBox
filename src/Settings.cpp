@@ -20,6 +20,7 @@ const char *WATCHLIST_PRICE_ALERTS = "WatchlistPriceAlerts";
 const char *FINISHED_COLLECTIONS = "FinishedCollections";
 const char *SECONDARY_API_KEYS = "SecondaryAPIKeys";
 const char *COMPLETION_CACHES = "CompletionCaches";
+const char *CHARACTER_CACHES = "CharacterCaches";
 const char *CUSTOM_ITEM_IDS_LEGACY = "CustomItemIds"; // pre-migration format: plain list of item IDs
 
 namespace Settings
@@ -95,6 +96,9 @@ namespace Settings
 
         if (!Settings[COMPLETION_CACHES].is_null())
             Settings[COMPLETION_CACHES].get_to<std::map<std::string, CompletionCache>>(CompletionCaches);
+
+        if (!Settings[CHARACTER_CACHES].is_null())
+            Settings[CHARACTER_CACHES].get_to<std::map<std::string, std::vector<CharacterInfo>>>(CharacterCaches);
     }
 
     void Save(std::filesystem::path SettingsPath)
@@ -117,6 +121,7 @@ namespace Settings
             Settings[FINISHED_COLLECTIONS] = FinishedCollections;
             Settings[SECONDARY_API_KEYS] = SecondaryAPIKeys;
             Settings[COMPLETION_CACHES] = CompletionCaches;
+            Settings[CHARACTER_CACHES] = CharacterCaches;
 
             std::ofstream file(SettingsPath);
             file << Settings.dump(1, '\t') << std::endl;
@@ -149,4 +154,5 @@ namespace Settings
     std::set<std::string> FinishedCollections;
     std::vector<SecondaryAccount> SecondaryAPIKeys;
     std::map<std::string, CompletionCache> CompletionCaches;
+    std::map<std::string, std::vector<CharacterInfo>> CharacterCaches;
 }
