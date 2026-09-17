@@ -42,6 +42,13 @@ private:
         Relics,
     };
 
+    enum class CollectionSort
+    {
+        InstantBuy,
+        BuyOrder,
+        ItemsNeeded,
+    };
+
     int render_table(const std::string &request_id);
     void top_section_child();
 
@@ -86,7 +93,8 @@ private:
     std::map<int, std::pair<int, int>> collection_item_prices; // item_id -> {buy_unit, sell_unit} copper
     bool collection_prices_requested = false;
     bool collection_prices_loaded = false;
-    bool collections_sort_ascending = true; // sort order for locked collections by total instant-buy price
+    CollectionSort collection_sort = CollectionSort::InstantBuy;
+    bool collections_sort_ascending = true;
 
     PriceFilter price_filter = PriceFilter::All; // active filter for the Prices tab tables
 
