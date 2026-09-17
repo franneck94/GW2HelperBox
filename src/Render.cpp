@@ -1680,7 +1680,7 @@ void Render::characters_child()
     constexpr ImGuiTableFlags flags = ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
                                       ImGuiTableFlags_Resizable | ImGuiTableFlags_Sortable |
                                       ImGuiTableFlags_ScrollX | ImGuiTableFlags_ScrollY;
-    const auto table_width = std::min(ImGui::GetContentRegionAvail().x, 1000.0f);
+    const auto table_width = min(ImGui::GetContentRegionAvail().x, 1000.0f);
     if (!ImGui::BeginTable("CharactersTable", 9, flags, ImVec2(table_width, 400.0f)))
         return;
 

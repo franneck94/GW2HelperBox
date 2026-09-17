@@ -10,6 +10,12 @@ All notable changes to this project will be documented in this file.
 3. Start the game and load the Addon. This will trigger the download of the updated. exe files
 4. Restart the game
 
+## 1.2.0
+
+- Added Wizard Vault
+- Added Weekly Stike Clears
+- Added Daily Raids
+
 ## 1.1.0
 
 - Merged Orders & Material Orders Tab
