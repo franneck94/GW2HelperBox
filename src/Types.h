@@ -109,6 +109,7 @@ struct CharacterCrafting
     int rating = 0;
     bool active = false; // at most two disciplines can be active at a time
 };
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(CharacterCrafting, discipline, rating, active)
 
 struct CharacterInfo
 {
@@ -123,6 +124,8 @@ struct CharacterInfo
     bool has_inventory = false; // false when the API key is missing the "inventories" scope
     std::vector<CharacterCrafting> crafting;
 };
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(CharacterInfo, name, race, profession, level, age_seconds,
+                                                created, deaths, inventory_slots, has_inventory, crafting)
 
 enum class DailyRaidBounty
 {
