@@ -29,7 +29,7 @@ public:
     static constexpr std::size_t MAX_READ_SIZE = 1024 * 1024;
 
     [[nodiscard]] static Address ExecutableBaseAddress() noexcept;
-    [[nodiscard]] static std::optional<Address> ParseAddress(std::string_view text) noexcept;
+    [[nodiscard]] static std::optional<Address> ParseAddress(std::string_view text);
 
     [[nodiscard]] ReadResult Read(Address address, std::size_t size) const;
     [[nodiscard]] ReadResult ReadExecutableOffset(Address offset, std::size_t size) const;
