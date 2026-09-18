@@ -19,6 +19,7 @@ const char *CUSTOM_ITEMS = "CustomItems";
 const char *WATCHLIST_PRICE_ALERTS = "WatchlistPriceAlerts";
 const char *FINISHED_COLLECTIONS = "FinishedCollections";
 const char *SECONDARY_API_KEYS = "SecondaryAPIKeys";
+const char *MEMORY_BOOKMARKS = "MemoryBookmarks";
 const char *COMPLETION_CACHES = "CompletionCaches";
 const char *CHARACTER_CACHES = "CharacterCaches";
 const char *CUSTOM_ITEM_IDS_LEGACY = "CustomItemIds"; // pre-migration format: plain list of item IDs
@@ -94,6 +95,9 @@ namespace Settings
         if (!Settings[SECONDARY_API_KEYS].is_null())
             Settings[SECONDARY_API_KEYS].get_to<std::vector<SecondaryAccount>>(SecondaryAPIKeys);
 
+        if (!Settings[MEMORY_BOOKMARKS].is_null())
+            Settings[MEMORY_BOOKMARKS].get_to<std::vector<MemoryBookmark>>(MemoryBookmarks);
+
         if (!Settings[COMPLETION_CACHES].is_null())
             Settings[COMPLETION_CACHES].get_to<std::map<std::string, CompletionCache>>(CompletionCaches);
 
@@ -120,6 +124,7 @@ namespace Settings
             Settings[WATCHLIST_PRICE_ALERTS] = WatchlistPriceAlerts;
             Settings[FINISHED_COLLECTIONS] = FinishedCollections;
             Settings[SECONDARY_API_KEYS] = SecondaryAPIKeys;
+            Settings[MEMORY_BOOKMARKS] = MemoryBookmarks;
             Settings[COMPLETION_CACHES] = CompletionCaches;
             Settings[CHARACTER_CACHES] = CharacterCaches;
 
@@ -153,6 +158,7 @@ namespace Settings
     std::vector<WatchlistPriceAlert> WatchlistPriceAlerts;
     std::set<std::string> FinishedCollections;
     std::vector<SecondaryAccount> SecondaryAPIKeys;
+    std::vector<MemoryBookmark> MemoryBookmarks;
     std::map<std::string, CompletionCache> CompletionCaches;
     std::map<std::string, std::vector<CharacterInfo>> CharacterCaches;
 }
