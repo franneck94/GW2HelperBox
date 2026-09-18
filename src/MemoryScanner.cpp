@@ -84,7 +84,7 @@ MemoryScanner::Address MemoryScanner::ExecutableBaseAddress() noexcept
     return reinterpret_cast<Address>(GetModuleHandleW(nullptr));
 }
 
-std::optional<MemoryScanner::Address> MemoryScanner::ParseAddress(const std::string_view text) noexcept
+std::optional<MemoryScanner::Address> MemoryScanner::ParseAddress(const std::string_view text)
 {
     const auto first = text.find_first_not_of(" \t\r\n");
     if (first == std::string_view::npos)
