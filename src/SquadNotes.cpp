@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <cctype>
 #include <chrono>
 #include <ctime>
 #include <fstream>
@@ -75,7 +76,16 @@ namespace SquadNotes
         json out;
         {
             std::lock_guard<std::mutex> lock(mutex);
-            out = notes;
+            std::map<std::string, AccountNote> commented_notes;
+            for (const auto &[account_name, account_note] : notes)
+            {
+                const auto has_comment = std::any_of(account_note.note.begin(), account_note.note.end(), [](const unsigned char character)
+                                                     { return !std::isspace(character); });
+                if (has_comment)
+                    commented_notes.emplace(account_name, account_note);
+            }
+
+            out = commented_notes;
             notes_dirty = false;
         }
 
