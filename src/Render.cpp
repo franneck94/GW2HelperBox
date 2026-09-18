@@ -67,12 +67,13 @@ namespace
         const char *name;
     };
 
-    constexpr std::array IBS5_STRIKE_ENCOUNTERS = {
+    constexpr std::array IBS_STRIKE_ENCOUNTERS = {
         StrikeEncounterDefinition{"icebrood_construct", "Shiverpeaks Pass"},
-        StrikeEncounterDefinition{"voice_and_claw", "Voice and Claw of the Fallen"},
         StrikeEncounterDefinition{"fraenir_of_jormag", "Fraenir of Jormag"},
-        StrikeEncounterDefinition{"boneskinner", "Boneskinner"},
+        StrikeEncounterDefinition{"voice_and_claw", "Voice of the Fallen and Claw of the Fallen"},
         StrikeEncounterDefinition{"whisper_of_jormag", "Whisper of Jormag"},
+        StrikeEncounterDefinition{"boneskinner", "Boneskinner"},
+        StrikeEncounterDefinition{"cold_war", "Cold War"},
     };
 
     constexpr std::array EOD_STRIKE_ENCOUNTERS = {
@@ -88,8 +89,25 @@ namespace
     };
 
     constexpr std::array OTHER_STRIKE_ENCOUNTERS = {
-        StrikeEncounterDefinition{"kela", "Kela"},
-        StrikeEncounterDefinition{"vloxx", "Vloxx"},
+        StrikeEncounterDefinition{"old_lions_court", "Old Lion's Court"},
+        StrikeEncounterDefinition{"guardians_glade", "Guardian's Glade"},
+    };
+
+    constexpr std::array WEEKLY_STRIKE_ACHIEVEMENT_ENCOUNTERS = {
+        IBS_STRIKE_ENCOUNTERS[0],
+        IBS_STRIKE_ENCOUNTERS[1],
+        IBS_STRIKE_ENCOUNTERS[2],
+        IBS_STRIKE_ENCOUNTERS[3],
+        IBS_STRIKE_ENCOUNTERS[4],
+        IBS_STRIKE_ENCOUNTERS[5],
+        EOD_STRIKE_ENCOUNTERS[0],
+        EOD_STRIKE_ENCOUNTERS[1],
+        EOD_STRIKE_ENCOUNTERS[2],
+        EOD_STRIKE_ENCOUNTERS[3],
+        SOTO_STRIKE_ENCOUNTERS[0],
+        SOTO_STRIKE_ENCOUNTERS[1],
+        OTHER_STRIKE_ENCOUNTERS[0],
+        OTHER_STRIKE_ENCOUNTERS[1],
     };
 
     bool strike_encounter_id_matches(const std::string &event_id, const StrikeEncounterDefinition &encounter)
@@ -109,10 +127,42 @@ namespace
 
     bool is_weekly_strike_encounter(const std::string &event_id)
     {
-        return contains_strike_encounter(IBS5_STRIKE_ENCOUNTERS, event_id) ||
+        return contains_strike_encounter(IBS_STRIKE_ENCOUNTERS, event_id) ||
                contains_strike_encounter(EOD_STRIKE_ENCOUNTERS, event_id) ||
                contains_strike_encounter(SOTO_STRIKE_ENCOUNTERS, event_id) ||
-               contains_strike_encounter(OTHER_STRIKE_ENCOUNTERS, event_id);
+               contains_strike_encounter(OTHER_STRIKE_ENCOUNTERS, event_id) ||
+               event_id == "kela" || event_id == "vloxx";
+    }
+
+    bool parse_weekly_strike_achievement(const json &response, std::set<std::string> &cleared_events)
+    {
+        constexpr auto achievement_id = 9125;
+        const json *progress = nullptr;
+
+        if (response.is_object() && response.value("id", 0) == achievement_id)
+            progress = &response;
+        else if (response.is_array())
+        {
+            const auto entry = std::find_if(response.begin(), response.end(), [](const json &candidate)
+                                            { return candidate.value("id", 0) == achievement_id; });
+            if (entry != response.end())
+                progress = &*entry;
+        }
+
+        if (progress == nullptr || !progress->contains("bits") || !(*progress)["bits"].is_array())
+            return false;
+
+        cleared_events.clear();
+        for (const auto &bit : (*progress)["bits"])
+        {
+            if (!bit.is_number_unsigned() && !bit.is_number_integer())
+                continue;
+
+            const auto index = bit.get<int>();
+            if (index >= 0 && index < static_cast<int>(WEEKLY_STRIKE_ACHIEVEMENT_ENCOUNTERS.size()))
+                cleared_events.insert(WEEKLY_STRIKE_ACHIEVEMENT_ENCOUNTERS[index].id);
+        }
+        return true;
     }
 
     constexpr std::array<const char *, static_cast<std::size_t>(DailyRaidBounty::Count)> DAILY_RAID_BOUNTY_NAMES = {
@@ -264,6 +314,8 @@ namespace
             return event_id == "minister_li";
         case DailyRaidBounty::HarvestTemple:
             return event_id == "the_dragonvoid" || event_id == "dragonvoid";
+        case DailyRaidBounty::Kela:
+            return event_id == "guardians_glade";
         default:
             return false;
         }
@@ -1043,11 +1095,13 @@ void Render::weekly_child()
         loaded_completions_account_key = selected_key;
         weekly_loaded = false;
         weekly_error.clear();
+        weekly_strikes_error.clear();
         wizard_vault_weekly_error.clear();
         raid_wings.clear();
         dungeon_defs.clear();
         world_bosses.clear();
         cleared_raid_events.clear();
+        cleared_strike_events.clear();
         cleared_dungeon_paths.clear();
         killed_world_bosses.clear();
         wizard_vault_weekly.clear();
@@ -1059,6 +1113,7 @@ void Render::weekly_child()
             dungeon_defs = cached->second.dungeon_defs;
             world_bosses = cached->second.world_bosses;
             cleared_raid_events = cached->second.cleared_raid_events;
+            cleared_strike_events = cached->second.cleared_strike_events;
             cleared_dungeon_paths = cached->second.cleared_dungeon_paths;
             killed_world_bosses = cached->second.killed_world_bosses;
             wizard_vault_weekly = cached->second.wizard_vault_weekly;
@@ -1079,17 +1134,20 @@ void Render::weekly_child()
         dungeons_def_future = HTTPClient::GetRequestAsync(L"https://api.guildwars2.com/v2/dungeons?ids=all");
         worldbosses_def_future = HTTPClient::GetRequestAsync(L"https://api.guildwars2.com/v2/worldbosses");
         account_raids_future = HTTPClient::GetRequestAsync(L"https://api.guildwars2.com/v2/account/raids?access_token=" + token);
+        weekly_strikes_future = HTTPClient::GetRequestAsync(L"https://api.guildwars2.com/v2/account/achievements?id=9125&access_token=" + token);
         account_dungeons_future = HTTPClient::GetRequestAsync(L"https://api.guildwars2.com/v2/account/dungeons?access_token=" + token);
         account_worldbosses_future = HTTPClient::GetRequestAsync(L"https://api.guildwars2.com/v2/account/worldbosses?access_token=" + token);
         wizard_vault_weekly_future = HTTPClient::GetRequestAsync(L"https://api.guildwars2.com/v2/account/wizardsvault/weekly?access_token=" + token);
         weekly_request_account_key = selected_key;
         weekly_requested = true;
         weekly_error.clear();
+        weekly_strikes_error.clear();
         wizard_vault_weekly_error.clear();
     }
 
     if (weekly_requested && raids_def_future.has_value() && dungeons_def_future.has_value() &&
         worldbosses_def_future.has_value() && account_raids_future.has_value() &&
+        weekly_strikes_future.has_value() &&
         account_dungeons_future.has_value() && account_worldbosses_future.has_value() &&
         wizard_vault_weekly_future.has_value())
     {
@@ -1097,7 +1155,8 @@ void Render::weekly_child()
         { return f->wait_for(std::chrono::seconds(0)) == std::future_status::ready; };
 
         if (ready(raids_def_future) && ready(dungeons_def_future) && ready(worldbosses_def_future) &&
-            ready(account_raids_future) && ready(account_dungeons_future) && ready(account_worldbosses_future) &&
+            ready(account_raids_future) && ready(weekly_strikes_future) &&
+            ready(account_dungeons_future) && ready(account_worldbosses_future) &&
             ready(wizard_vault_weekly_future))
         {
             try
@@ -1137,6 +1196,17 @@ void Render::weekly_child()
                         refreshed.cleared_raid_events.insert(id.get<std::string>());
                 else if (acc_raids.contains("text"))
                     refresh_error = acc_raids["text"].get<std::string>();
+
+                const auto weekly_strikes = json::parse(weekly_strikes_future->get());
+                if (!parse_weekly_strike_achievement(weekly_strikes, refreshed.cleared_strike_events))
+                {
+                    weekly_strikes_error = weekly_strikes.is_object()
+                                               ? weekly_strikes.value("text", "Unexpected weekly strike achievement response.")
+                                               : "Unexpected weekly strike achievement response.";
+                    const auto cached = Settings::CompletionCaches.find(weekly_request_account_key);
+                    if (cached != Settings::CompletionCaches.end())
+                        refreshed.cleared_strike_events = cached->second.cleared_strike_events;
+                }
 
                 const auto acc_dungeons = json::parse(account_dungeons_future->get());
                 if (acc_dungeons.is_array())
@@ -1187,6 +1257,7 @@ void Render::weekly_child()
                         dungeon_defs = std::move(refreshed.dungeon_defs);
                         world_bosses = std::move(refreshed.world_bosses);
                         cleared_raid_events = std::move(refreshed.cleared_raid_events);
+                        cleared_strike_events = std::move(refreshed.cleared_strike_events);
                         cleared_dungeon_paths = std::move(refreshed.cleared_dungeon_paths);
                         killed_world_bosses = std::move(refreshed.killed_world_bosses);
                         wizard_vault_weekly = std::move(refreshed.wizard_vault_weekly);
@@ -1206,6 +1277,7 @@ void Render::weekly_child()
             dungeons_def_future.reset();
             worldbosses_def_future.reset();
             account_raids_future.reset();
+            weekly_strikes_future.reset();
             account_dungeons_future.reset();
             account_worldbosses_future.reset();
             wizard_vault_weekly_future.reset();
@@ -1331,7 +1403,7 @@ void Render::weekly_child()
     const auto current_daily_bounties = current_daily_raid_bounties();
     const auto strike_is_cleared = [&](const StrikeEncounterDefinition &encounter)
     {
-        return std::any_of(cleared_raid_events.begin(), cleared_raid_events.end(), [&](const std::string &event_id)
+        return std::any_of(cleared_strike_events.begin(), cleared_strike_events.end(), [&](const std::string &event_id)
                            { return strike_encounter_id_matches(event_id, encounter); });
     };
     const auto strike_is_daily = [&](const StrikeEncounterDefinition &encounter)
@@ -1367,7 +1439,9 @@ void Render::weekly_child()
     ImGui::Spacing();
     ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.4f, 1.0f), "Strike Raid Encounters (weekly reset)");
     ImGui::Separator();
-    render_strike_category("IBS5", IBS5_STRIKE_ENCOUNTERS);
+    if (!weekly_strikes_error.empty())
+        ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.2f, 1.0f), "%s", weekly_strikes_error.c_str());
+    render_strike_category("IBS", IBS_STRIKE_ENCOUNTERS);
     render_strike_category("EOD", EOD_STRIKE_ENCOUNTERS);
     render_strike_category("SOTO", SOTO_STRIKE_ENCOUNTERS);
     render_strike_category("Others", OTHER_STRIKE_ENCOUNTERS);
