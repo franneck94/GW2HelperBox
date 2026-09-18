@@ -59,6 +59,7 @@ private:
     void delivery_child();
     void calculators_child();
     void settings_child();
+    void memory_reader_child();
     void weekly_child();
     void characters_child();
     void squad_notes_child();
