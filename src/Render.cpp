@@ -3249,6 +3249,14 @@ void Render::render()
                 ImGui::EndTabItem();
             }
 
+#ifdef GW2HB_DEBUG
+            if (ImGui::BeginTabItem("Memory Reader"))
+            {
+                memory_reader_child();
+                ImGui::EndTabItem();
+            }
+#endif
+
             if (ImGui::BeginTabItem("Settings"))
             {
                 settings_child();
