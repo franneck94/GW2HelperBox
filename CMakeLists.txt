@@ -61,6 +61,7 @@ target_include_directories(third_party_libs PUBLIC
 add_library(first_party_libs STATIC
     "src/Shared.cpp"
     "src/MemoryScanner.cpp"
+    "src/RenderMemory.cpp"
     "src/Settings.cpp"
     "src/SquadNotes.cpp"
     "src/Render.cpp"
@@ -71,6 +72,9 @@ add_library(first_party_libs STATIC
 target_include_directories(first_party_libs PUBLIC
     "src"
     "resources"
+)
+target_compile_definitions(first_party_libs PRIVATE
+    $<$<CONFIG:Debug>:GW2HB_DEBUG>
 )
 target_link_libraries(first_party_libs PRIVATE
     third_party_libs
