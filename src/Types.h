@@ -201,13 +201,14 @@ struct CompletionCache
     std::vector<std::pair<std::string, std::vector<std::string>>> dungeon_defs;
     std::vector<std::string> world_bosses;
     std::set<std::string> cleared_raid_events;
+    std::set<std::string> cleared_strike_events;
     std::set<std::string> cleared_dungeon_paths;
     std::set<std::string> killed_world_bosses;
     std::vector<WizardVaultObjective> wizard_vault_weekly;
 };
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(CompletionCache, raid_wings, dungeon_defs, world_bosses,
-                                                cleared_raid_events, cleared_dungeon_paths, killed_world_bosses,
-                                                wizard_vault_weekly)
+                                                cleared_raid_events, cleared_strike_events, cleared_dungeon_paths,
+                                                killed_world_bosses, wizard_vault_weekly)
 
 struct OutdatedOrderNotification
 {
