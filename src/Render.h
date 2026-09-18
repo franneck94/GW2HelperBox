@@ -116,10 +116,12 @@ private:
     std::optional<std::future<std::string>> account_dungeons_future;
     std::optional<std::future<std::string>> worldbosses_def_future;
     std::optional<std::future<std::string>> account_worldbosses_future;
+    std::optional<std::future<std::string>> weekly_strikes_future;
     std::optional<std::future<std::string>> wizard_vault_weekly_future;
     bool weekly_requested = false;
     bool weekly_loaded = false;
     std::string weekly_error;
+    std::string weekly_strikes_error;
     std::string wizard_vault_weekly_error;
     int completions_account_index = 0; // 0 = main account, 1..N = secondary keys
     std::string loaded_completions_account_key;
@@ -128,6 +130,7 @@ private:
     std::vector<std::pair<std::string, std::vector<std::string>>> dungeon_defs; // dungeon id -> path ids
     std::vector<std::string> world_bosses;                                      // all world boss ids
     std::set<std::string> cleared_raid_events;
+    std::set<std::string> cleared_strike_events;
     std::set<std::string> cleared_dungeon_paths;
     std::set<std::string> killed_world_bosses;
     std::vector<WizardVaultObjective> wizard_vault_weekly;
