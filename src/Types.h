@@ -1,6 +1,7 @@
 #pragma once
 
 #include <chrono>
+#include <cstdint>
 #include <future>
 #include <optional>
 #include <set>
@@ -82,6 +83,15 @@ struct SecondaryAccount
     std::string api_key; // only used for the Completions tab, never for trading
 };
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(SecondaryAccount, name, api_key)
+
+struct MemoryBookmark
+{
+    std::string name;
+    std::uint64_t address = 0;
+    bool executable_relative = false;
+    int read_size = 256;
+};
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(MemoryBookmark, name, address, executable_relative, read_size)
 
 struct AccountNote
 {
