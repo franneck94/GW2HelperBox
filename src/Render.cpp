@@ -321,9 +321,17 @@ namespace
         }
     }
 
-    void render_daily_raid_rotations()
+    void render_daily_raid_rotations(const std::set<std::string> &cleared_raid_events,
+                                     const std::set<std::string> &cleared_strike_events)
     {
         const auto current_bounties = current_daily_raid_bounties();
+        const auto bounty_is_cleared = [&](const DailyRaidBounty bounty)
+        {
+            const auto matches_bounty = [&](const std::string &event_id)
+            { return raid_event_matches_bounty(event_id, bounty); };
+            return std::any_of(cleared_raid_events.begin(), cleared_raid_events.end(), matches_bounty) ||
+                   std::any_of(cleared_strike_events.begin(), cleared_strike_events.end(), matches_bounty);
+        };
 
         ImGui::Spacing();
         ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.4f, 1.0f), "Today's Raid Bounties (UTC reset)");
@@ -339,7 +347,12 @@ namespace
             for (const auto bounty : current_bounties)
             {
                 ImGui::TableNextColumn();
-                ImGui::TextWrapped("Raid Bounty: %s", daily_raid_bounty_name(bounty));
+                const auto cleared = bounty_is_cleared(bounty);
+                if (cleared)
+                    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.4f, 1.0f, 0.4f, 1.0f));
+                ImGui::TextWrapped("%s Raid Bounty: %s", cleared ? "[x]" : "[ ]", daily_raid_bounty_name(bounty));
+                if (cleared)
+                    ImGui::PopStyleColor();
             }
             ImGui::EndTable();
         }
@@ -357,15 +370,19 @@ namespace
         ImGui::TableSetupColumn("Boss 4", ImGuiTableColumnFlags_WidthStretch);
         ImGui::TableHeadersRow();
 
-        const auto render_cell = [](const auto &rotation, std::size_t row, DailyRaidBounty current)
+        const auto render_cell = [&](const auto &rotation, std::size_t row, DailyRaidBounty current)
         {
             ImGui::TableNextColumn();
             if (row < rotation.size())
             {
                 const auto selected = rotation[row] == current;
+                const auto cleared = selected && bounty_is_cleared(rotation[row]);
                 if (selected)
-                    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.4f, 1.0f, 0.4f, 1.0f));
-                ImGui::TextWrapped("%zu. Raid Bounty: %s", row + 1, daily_raid_bounty_name(rotation[row]));
+                    ImGui::PushStyleColor(ImGuiCol_Text, cleared ? ImVec4(0.4f, 1.0f, 0.4f, 1.0f)
+                                                               : ImVec4(1.0f, 0.85f, 0.4f, 1.0f));
+                ImGui::TextWrapped("%zu. %sRaid Bounty: %s", row + 1,
+                                   selected ? (cleared ? "[x] " : "[ ] ") : "",
+                                   daily_raid_bounty_name(rotation[row]));
                 if (selected)
                     ImGui::PopStyleColor();
             }
@@ -1494,7 +1511,7 @@ void Render::weekly_child()
         }
     }
 
-    render_daily_raid_rotations();
+    render_daily_raid_rotations(cleared_raid_events, cleared_strike_events);
 
     render_group("Dungeons (daily reset)", dungeon_defs, cleared_dungeon_paths, "dungeon_");
 
