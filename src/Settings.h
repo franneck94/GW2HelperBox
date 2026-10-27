@@ -46,6 +46,7 @@ namespace Settings
     extern std::vector<CustomItem> CustomItems;
     extern std::vector<WatchlistPriceAlert> WatchlistPriceAlerts;
     extern std::set<std::string> FinishedCollections;
+    extern std::set<std::string> SkippedCollections;
     extern std::vector<SecondaryAccount> SecondaryAPIKeys;
     extern std::vector<MemoryBookmark> MemoryBookmarks;
     extern std::map<std::string, CompletionCache> CompletionCaches;
