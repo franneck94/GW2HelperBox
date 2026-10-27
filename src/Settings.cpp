@@ -18,6 +18,7 @@ const char *NOTIFIED_OUTDATED_ORDER_IDS = "NotifiedOutdatedOrderIds";
 const char *CUSTOM_ITEMS = "CustomItems";
 const char *WATCHLIST_PRICE_ALERTS = "WatchlistPriceAlerts";
 const char *FINISHED_COLLECTIONS = "FinishedCollections";
+const char *SKIPPED_COLLECTIONS = "SkippedCollections";
 const char *SECONDARY_API_KEYS = "SecondaryAPIKeys";
 const char *MEMORY_BOOKMARKS = "MemoryBookmarks";
 const char *COMPLETION_CACHES = "CompletionCaches";
@@ -91,6 +92,8 @@ namespace Settings
 
         if (!Settings[FINISHED_COLLECTIONS].is_null())
             Settings[FINISHED_COLLECTIONS].get_to<std::set<std::string>>(FinishedCollections);
+        if (!Settings[SKIPPED_COLLECTIONS].is_null())
+            Settings[SKIPPED_COLLECTIONS].get_to<std::set<std::string>>(SkippedCollections);
 
         if (!Settings[SECONDARY_API_KEYS].is_null())
             Settings[SECONDARY_API_KEYS].get_to<std::vector<SecondaryAccount>>(SecondaryAPIKeys);
@@ -123,6 +126,7 @@ namespace Settings
             Settings[CUSTOM_ITEMS] = CustomItems;
             Settings[WATCHLIST_PRICE_ALERTS] = WatchlistPriceAlerts;
             Settings[FINISHED_COLLECTIONS] = FinishedCollections;
+            Settings[SKIPPED_COLLECTIONS] = SkippedCollections;
             Settings[SECONDARY_API_KEYS] = SecondaryAPIKeys;
             Settings[MEMORY_BOOKMARKS] = MemoryBookmarks;
             Settings[COMPLETION_CACHES] = CompletionCaches;
@@ -157,6 +161,7 @@ namespace Settings
     std::vector<CustomItem> CustomItems;
     std::vector<WatchlistPriceAlert> WatchlistPriceAlerts;
     std::set<std::string> FinishedCollections;
+    std::set<std::string> SkippedCollections;
     std::vector<SecondaryAccount> SecondaryAPIKeys;
     std::vector<MemoryBookmark> MemoryBookmarks;
     std::map<std::string, CompletionCache> CompletionCaches;
