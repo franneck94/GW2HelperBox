@@ -2024,7 +2024,7 @@ void Render::collections_child()
                 auto newly_finished = false;
                 for (const auto &[name, skin_ids] : CollectionSkins::COLLECTIONS)
                 {
-                    if (Settings::FinishedCollections.count(name) > 0)
+                    if (Settings::FinishedCollections.count(name) > 0 || Settings::SkippedCollections.count(name) > 0)
                         continue;
                     const auto complete = !skin_ids.empty() &&
                                           std::all_of(skin_ids.begin(), skin_ids.end(),
@@ -2061,7 +2061,7 @@ void Render::collections_child()
         std::set<int> needed_items;
         for (const auto &[name, skin_ids] : CollectionSkins::COLLECTIONS)
         {
-            if (Settings::FinishedCollections.count(name) > 0)
+            if (Settings::FinishedCollections.count(name) > 0 || Settings::SkippedCollections.count(name) > 0)
                 continue;
             for (const auto &[skin_id, skin_name] : skin_ids)
             {
@@ -2151,8 +2151,15 @@ void Render::collections_child()
 
     std::vector<const decltype(CollectionSkins::COLLECTIONS)::value_type *> done;
     std::vector<const decltype(CollectionSkins::COLLECTIONS)::value_type *> not_done;
+    std::vector<const decltype(CollectionSkins::COLLECTIONS)::value_type *> skipped;
     for (const auto &collection : CollectionSkins::COLLECTIONS)
     {
+        if (Settings::SkippedCollections.count(collection.first) > 0)
+        {
+            skipped.push_back(&collection);
+            continue;
+        }
+
         const auto finished = Settings::FinishedCollections.count(collection.first) > 0;
         (finished ? done : not_done).push_back(&collection);
     }
@@ -2228,6 +2235,13 @@ void Render::collections_child()
                             "##" + collection->first;
         if (!ImGui::CollapsingHeader(header.c_str()))
             return;
+
+        ImGui::SameLine();
+        if (ImGui::SmallButton(("Skip##" + collection->first).c_str()))
+        {
+            Settings::SkippedCollections.insert(collection->first);
+            Settings::Save(Globals::SettingsPath);
+        }
 
         const ImGuiTableFlags flags = ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg;
         if (ImGui::BeginTable(("NeededItems##" + collection->first).c_str(), 3, flags))
@@ -2351,6 +2365,24 @@ void Render::collections_child()
     {
         for (const auto *collection : done)
             ImGui::BulletText("%s", collection->first.c_str());
+    }
+
+    ImGui::Spacing();
+    ImGui::Separator();
+    ImGui::Spacing();
+    ImGui::SetNextItemOpen(false, ImGuiCond_Once);
+    if (ImGui::CollapsingHeader((std::string("Skipped (") + std::to_string(skipped.size()) + ")").c_str()))
+    {
+        for (const auto *collection : skipped)
+        {
+            ImGui::BulletText("%s", collection->first.c_str());
+            ImGui::SameLine();
+            if (ImGui::SmallButton(("Restore##" + collection->first).c_str()))
+            {
+                Settings::SkippedCollections.erase(collection->first);
+                Settings::Save(Globals::SettingsPath);
+            }
+        }
     }
 
     if (copied_name_popup_requested)
@@ -2754,7 +2786,6 @@ void Render::update_outdated_order_notifications()
     for (const auto &order : data.my_orders_sells)
         current_ids.insert(order.item_id);
 
-    /* an order is no longer outdated - allow it to notify again if it becomes outdated later */
     auto settings_changed = false;
     for (auto it = Settings::NotifiedOutdatedOrderIds.begin(); it != Settings::NotifiedOutdatedOrderIds.end();)
     {
@@ -2956,6 +2987,8 @@ void Render::render_outdated_order_notifications()
 
         if (dismissed)
         {
+            Settings::NotifiedOutdatedOrderIds.insert(it->item_id);
+            Settings::Save(Globals::SettingsPath);
             it = outdated_order_notifications.erase(it);
             continue;
         }
