@@ -2226,13 +2226,22 @@ void Render::collections_child()
         return std::to_string(p.gold) + "g " + std::to_string(p.silver) + "s " +
                std::to_string(p.copper) + "c";
     };
+    const auto signed_coins_str = [](long long copper)
+    {
+        const auto negative = copper < 0;
+        const auto p = copper_to_price(static_cast<int>(std::abs(copper)));
+        const auto sign = negative ? "-" : "+";
+        return sign + std::to_string(p.gold) + "g " + std::to_string(p.silver) + "s " +
+               std::to_string(p.copper) + "c";
+    };
 
     const auto render_locked_collection = [&](const LockedCollection &entry)
     {
         const auto *collection = entry.collection;
+        const auto diff_total = entry.total_instant_buy - entry.total_buy_order;
         const auto header = collection->first + "  (" + std::to_string(entry.rows.size()) + ")  Order: " +
                             coins_str(entry.total_buy_order) + " | Insta: " + coins_str(entry.total_instant_buy) +
-                            "##" + collection->first;
+                            " | Diff: " + signed_coins_str(diff_total) + "##" + collection->first;
         if (!ImGui::CollapsingHeader(header.c_str()))
             return;
 
@@ -2244,11 +2253,12 @@ void Render::collections_child()
         }
 
         const ImGuiTableFlags flags = ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg;
-        if (ImGui::BeginTable(("NeededItems##" + collection->first).c_str(), 3, flags))
+        if (ImGui::BeginTable(("NeededItems##" + collection->first).c_str(), 4, flags))
         {
             ImGui::TableSetupColumn("Item", ImGuiTableColumnFlags_WidthStretch);
             ImGui::TableSetupColumn("Buy Order", ImGuiTableColumnFlags_WidthFixed, 120.0f);
             ImGui::TableSetupColumn("Instant Buy", ImGuiTableColumnFlags_WidthFixed, 120.0f);
+            ImGui::TableSetupColumn("Diff", ImGuiTableColumnFlags_WidthFixed, 120.0f);
             ImGui::TableHeadersRow();
 
             for (const auto &row : entry.rows)
@@ -2280,6 +2290,15 @@ void Render::collections_child()
                 }
                 else
                     ImGui::TextUnformatted("-");
+
+                ImGui::TableNextColumn();
+                if (row.has_price)
+                {
+                    const auto diff = static_cast<long long>(row.instant_buy) - row.buy_order;
+                    ImGui::TextUnformatted(signed_coins_str(diff).c_str());
+                }
+                else
+                    ImGui::TextUnformatted("-");
             }
 
             ImGui::TableNextRow();
@@ -2295,6 +2314,11 @@ void Render::collections_child()
                 const auto p = copper_to_price(static_cast<int>(entry.total_instant_buy));
                 ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.4f, 1.0f), "%dg %ds %dc", p.gold, p.silver, p.copper);
             }
+            ImGui::TableNextColumn();
+            {
+                const auto diff = entry.total_instant_buy - entry.total_buy_order;
+                ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.4f, 1.0f), "%s", signed_coins_str(diff).c_str());
+            }
 
             ImGui::EndTable();
         }
@@ -2302,10 +2326,12 @@ void Render::collections_child()
 
     long long grand_total_buy_order = 0;
     long long grand_total_instant_buy = 0;
+    long long grand_total_diff = 0;
     for (const auto &entry : priced)
     {
         grand_total_buy_order += entry.total_buy_order;
         grand_total_instant_buy += entry.total_instant_buy;
+        grand_total_diff += entry.total_instant_buy - entry.total_buy_order;
     }
 
     ImGui::Spacing();
@@ -2342,8 +2368,9 @@ void Render::collections_child()
     if (ImGui::Combo("##CollectionsSortDirection", &direction_index, direction_labels, IM_ARRAYSIZE(direction_labels)))
         collections_sort_ascending = direction_index == 0;
 
-    ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.4f, 1.0f), "All open collections  Order: %s | Insta: %s",
-                       coins_str(grand_total_buy_order).c_str(), coins_str(grand_total_instant_buy).c_str());
+    ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.4f, 1.0f), "All open collections  Order: %s | Insta: %s | Diff: %s",
+                       coins_str(grand_total_buy_order).c_str(), coins_str(grand_total_instant_buy).c_str(),
+                       signed_coins_str(grand_total_diff).c_str());
     ImGui::Separator();
 
     for (const auto &entry : priced)
