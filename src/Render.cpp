@@ -2223,11 +2223,14 @@ void Render::collections_child()
     const auto coins_str = [](long long copper)
     {
         const auto p = copper_to_price(static_cast<int>(std::abs(copper)));
-        if (!Settings::ShowCollectionPriceSilverCopper)
-            return std::to_string(p.gold) + "g";
+        std::string value = std::to_string(p.gold) + "g";
 
-        return std::to_string(p.gold) + "g " + std::to_string(p.silver) + "s " +
-               std::to_string(p.copper) + "c";
+        if (Settings::ShowCollectionPriceSilver)
+            value += " " + std::to_string(p.silver) + "s";
+        if (Settings::ShowCollectionPriceCopper)
+            value += " " + std::to_string(p.copper) + "c";
+
+        return value;
     };
     const auto signed_coins_str = [](long long copper)
     {
@@ -3272,7 +3275,10 @@ void Render::settings_child()
     if (ImGui::Checkbox("Hide Notifications While In Combat", &Settings::HideNotificationsInCombat))
         Settings::Save(Globals::SettingsPath);
 
-    if (ImGui::Checkbox("Show Silver/Copper in Collection Prices", &Settings::ShowCollectionPriceSilverCopper))
+    if (ImGui::Checkbox("Show Silver in Collection Prices", &Settings::ShowCollectionPriceSilver))
+        Settings::Save(Globals::SettingsPath);
+
+    if (ImGui::Checkbox("Show Copper in Collection Prices", &Settings::ShowCollectionPriceCopper))
         Settings::Save(Globals::SettingsPath);
 
     ImGui::TextUnformatted("Ecto rate for salvaging");
