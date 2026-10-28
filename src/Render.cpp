@@ -2222,17 +2222,19 @@ void Render::collections_child()
 
     const auto coins_str = [](long long copper)
     {
-        const auto p = copper_to_price(static_cast<int>(copper));
+        const auto p = copper_to_price(static_cast<int>(std::abs(copper)));
+        if (!Settings::ShowCollectionPriceSilverCopper)
+            return std::to_string(p.gold) + "g";
+
         return std::to_string(p.gold) + "g " + std::to_string(p.silver) + "s " +
                std::to_string(p.copper) + "c";
     };
     const auto signed_coins_str = [](long long copper)
     {
         const auto negative = copper < 0;
-        const auto p = copper_to_price(static_cast<int>(std::abs(copper)));
+        const auto gold = std::abs(copper) / 10000;
         const auto sign = negative ? "-" : "+";
-        return sign + std::to_string(p.gold) + "g " + std::to_string(p.silver) + "s " +
-               std::to_string(p.copper) + "c";
+        return sign + std::to_string(gold) + "g";
     };
 
     const auto render_locked_collection = [&](const LockedCollection &entry)
@@ -2245,7 +2247,30 @@ void Render::collections_child()
         if (!ImGui::CollapsingHeader(header.c_str()))
             return;
 
-        ImGui::SameLine();
+        auto rows = entry.rows;
+        const auto sort_row = [&](const NeededRow &lhs, const NeededRow &rhs) -> bool
+        {
+            const auto lhs_value = !lhs.has_price ? 0LL :
+                collection_sort == CollectionSort::BuyOrder ? lhs.buy_order :
+                collection_sort == CollectionSort::ItemsNeeded ? static_cast<long long>(lhs.name.size()) :
+                static_cast<long long>(lhs.instant_buy);
+            const auto rhs_value = !rhs.has_price ? 0LL :
+                collection_sort == CollectionSort::BuyOrder ? rhs.buy_order :
+                collection_sort == CollectionSort::ItemsNeeded ? static_cast<long long>(rhs.name.size()) :
+                static_cast<long long>(rhs.instant_buy);
+
+            if (!lhs.has_price && !rhs.has_price)
+                return lhs.name < rhs.name;
+            if (!lhs.has_price)
+                return false;
+            if (!rhs.has_price)
+                return true;
+
+            return collections_sort_ascending ? lhs_value < rhs_value : lhs_value > rhs_value;
+        };
+        std::stable_sort(rows.begin(), rows.end(), sort_row);
+
+        ImGui::Spacing();
         if (ImGui::SmallButton(("Skip##" + collection->first).c_str()))
         {
             Settings::SkippedCollections.insert(collection->first);
@@ -2261,7 +2286,7 @@ void Render::collections_child()
             ImGui::TableSetupColumn("Diff", ImGuiTableColumnFlags_WidthFixed, 120.0f);
             ImGui::TableHeadersRow();
 
-            for (const auto &row : entry.rows)
+            for (const auto &row : rows)
             {
                 ImGui::TableNextRow();
                 ImGui::TableNextColumn();
@@ -3245,6 +3270,9 @@ void Render::settings_child()
         Settings::Save(Globals::SettingsPath);
 
     if (ImGui::Checkbox("Hide Notifications While In Combat", &Settings::HideNotificationsInCombat))
+        Settings::Save(Globals::SettingsPath);
+
+    if (ImGui::Checkbox("Show Silver/Copper in Collection Prices", &Settings::ShowCollectionPriceSilverCopper))
         Settings::Save(Globals::SettingsPath);
 
     ImGui::TextUnformatted("Ecto rate for salvaging");
