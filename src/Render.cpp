@@ -2202,6 +2202,8 @@ void Render::collections_child()
             return entry.total_buy_order;
         case CollectionSort::ItemsNeeded:
             return static_cast<long long>(entry.rows.size());
+        case CollectionSort::TotalDiff:
+            return entry.total_instant_buy - entry.total_buy_order;
         case CollectionSort::InstantBuy:
         default:
             return entry.total_instant_buy;
@@ -2239,6 +2241,18 @@ void Render::collections_child()
         const auto sign = negative ? "-" : "+";
         return sign + std::to_string(gold) + "g";
     };
+    const auto price_display = [](int copper)
+    {
+        const auto p = copper_to_price(copper);
+        std::string value = std::to_string(p.gold) + "g";
+
+        if (Settings::ShowCollectionPriceSilver)
+            value += " " + std::to_string(p.silver) + "s";
+        if (Settings::ShowCollectionPriceCopper)
+            value += " " + std::to_string(p.copper) + "c";
+
+        return value;
+    };
 
     const auto render_locked_collection = [&](const LockedCollection &entry)
     {
@@ -2256,10 +2270,12 @@ void Render::collections_child()
             const auto lhs_value = !lhs.has_price ? 0LL :
                 collection_sort == CollectionSort::BuyOrder ? lhs.buy_order :
                 collection_sort == CollectionSort::ItemsNeeded ? static_cast<long long>(lhs.name.size()) :
+                collection_sort == CollectionSort::TotalDiff ? static_cast<long long>(lhs.instant_buy) - lhs.buy_order :
                 static_cast<long long>(lhs.instant_buy);
             const auto rhs_value = !rhs.has_price ? 0LL :
                 collection_sort == CollectionSort::BuyOrder ? rhs.buy_order :
                 collection_sort == CollectionSort::ItemsNeeded ? static_cast<long long>(rhs.name.size()) :
+                collection_sort == CollectionSort::TotalDiff ? static_cast<long long>(rhs.instant_buy) - rhs.buy_order :
                 static_cast<long long>(rhs.instant_buy);
 
             if (!lhs.has_price && !rhs.has_price)
@@ -2303,19 +2319,13 @@ void Render::collections_child()
 
                 ImGui::TableNextColumn();
                 if (row.has_price)
-                {
-                    const auto p = copper_to_price(row.buy_order);
-                    ImGui::Text("%dg %ds %dc", p.gold, p.silver, p.copper);
-                }
+                    ImGui::TextUnformatted(price_display(row.buy_order).c_str());
                 else
                     ImGui::TextUnformatted("-");
 
                 ImGui::TableNextColumn();
                 if (row.has_price)
-                {
-                    const auto p = copper_to_price(row.instant_buy);
-                    ImGui::Text("%dg %ds %dc", p.gold, p.silver, p.copper);
-                }
+                    ImGui::TextUnformatted(price_display(row.instant_buy).c_str());
                 else
                     ImGui::TextUnformatted("-");
 
@@ -2334,13 +2344,13 @@ void Render::collections_child()
             ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.4f, 1.0f), "Total");
             ImGui::TableNextColumn();
             {
-                const auto p = copper_to_price(static_cast<int>(entry.total_buy_order));
-                ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.4f, 1.0f), "%dg %ds %dc", p.gold, p.silver, p.copper);
+                const auto value = price_display(static_cast<int>(entry.total_buy_order));
+                ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.4f, 1.0f), "%s", value.c_str());
             }
             ImGui::TableNextColumn();
             {
-                const auto p = copper_to_price(static_cast<int>(entry.total_instant_buy));
-                ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.4f, 1.0f), "%dg %ds %dc", p.gold, p.silver, p.copper);
+                const auto value = price_display(static_cast<int>(entry.total_instant_buy));
+                ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.4f, 1.0f), "%s", value.c_str());
             }
             ImGui::TableNextColumn();
             {
@@ -2372,6 +2382,7 @@ void Render::collections_child()
         std::pair{CollectionSort::InstantBuy, "Insta buy"},
         std::pair{CollectionSort::BuyOrder, "Order"},
         std::pair{CollectionSort::ItemsNeeded, "Items needed"},
+        std::pair{CollectionSort::TotalDiff, "Total diff"},
     };
     const auto selected_sort = std::find_if(sort_options.begin(), sort_options.end(),
                                             [this](const auto &option)
