@@ -42,7 +42,8 @@ namespace Settings
     extern bool ShowOutdatedOrders;
     extern bool HideNotificationsInCombat;
     extern bool RaidBossesOnly;
-    extern bool ShowCollectionPriceSilverCopper;
+    extern bool ShowCollectionPriceSilver;
+    extern bool ShowCollectionPriceCopper;
     extern std::set<int> NotifiedOutdatedOrderIds;
     extern std::vector<CustomItem> CustomItems;
     extern std::vector<WatchlistPriceAlert> WatchlistPriceAlerts;
