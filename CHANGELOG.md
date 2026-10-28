@@ -10,6 +10,16 @@ All notable changes to this project will be documented in this file.
 3. Start the game and load the Addon. This will trigger the download of the updated. exe files
 4. Restart the game
 
+## 1.3.0
+
+### Today
+
+- Added a price-difference column to the collections tables showing the spread between buy order and instant buy values.
+
+### Yesterday
+
+- Improved the collection pricing view with clearer buy-order and instant-buy totals for each set.
+
 ## 1.2.0
 
 - Added Wizard Vault
