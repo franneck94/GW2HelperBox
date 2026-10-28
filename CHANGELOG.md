@@ -15,7 +15,9 @@ All notable changes to this project will be documented in this file.
 - Added a price-difference column to the collections tables showing the spread between buy order and instant buy values.
 - Moved the collection skip action into the expanded collection content.
 - Applied the global collection sort criteria inside each collection item table.
-- Added a setting to toggle silver/copper display for collection prices and defaulted the diff display to gold-only.
+- Added separate silver and copper visibility toggles for collection prices.
+- Added a total-diff sort option for collections.
+- Defaulted the diff display to gold-only while allowing silver/copper to be shown when enabled.
 - Improved the collection pricing view with clearer buy-order and instant-buy totals for each set.
 
 ## 1.2.0
