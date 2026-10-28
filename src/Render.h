@@ -47,6 +47,7 @@ private:
         InstantBuy,
         BuyOrder,
         ItemsNeeded,
+        TotalDiff,
     };
 
     int render_table(const std::string &request_id);
