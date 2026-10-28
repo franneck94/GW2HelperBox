@@ -14,6 +14,7 @@ const char *SCRIPTS_IN_BACKGROUND = "ScriptsInBackground";
 const char *SHOW_OUTDATED_ORDERS = "ShowOutdatedOrders";
 const char *HIDE_NOTIFICATIONS_IN_COMBAT = "HideNotificationsInCombat";
 const char *RAID_BOSSES_ONLY = "RaidBossesOnly";
+const char *SHOW_COLLECTION_PRICE_SILVER_COPPER = "ShowCollectionPriceSilverCopper";
 const char *NOTIFIED_OUTDATED_ORDER_IDS = "NotifiedOutdatedOrderIds";
 const char *CUSTOM_ITEMS = "CustomItems";
 const char *WATCHLIST_PRICE_ALERTS = "WatchlistPriceAlerts";
@@ -74,6 +75,8 @@ namespace Settings
             Settings[HIDE_NOTIFICATIONS_IN_COMBAT].get_to<bool>(HideNotificationsInCombat);
         if (!Settings[RAID_BOSSES_ONLY].is_null())
             Settings[RAID_BOSSES_ONLY].get_to<bool>(RaidBossesOnly);
+        if (!Settings[SHOW_COLLECTION_PRICE_SILVER_COPPER].is_null())
+            Settings[SHOW_COLLECTION_PRICE_SILVER_COPPER].get_to<bool>(ShowCollectionPriceSilverCopper);
         if (!Settings[NOTIFIED_OUTDATED_ORDER_IDS].is_null())
             Settings[NOTIFIED_OUTDATED_ORDER_IDS].get_to<std::set<int>>(NotifiedOutdatedOrderIds);
         if (!Settings[CUSTOM_ITEMS].is_null())
@@ -122,6 +125,7 @@ namespace Settings
             Settings[SHOW_OUTDATED_ORDERS] = ShowOutdatedOrders;
             Settings[HIDE_NOTIFICATIONS_IN_COMBAT] = HideNotificationsInCombat;
             Settings[RAID_BOSSES_ONLY] = RaidBossesOnly;
+            Settings[SHOW_COLLECTION_PRICE_SILVER_COPPER] = ShowCollectionPriceSilverCopper;
             Settings[NOTIFIED_OUTDATED_ORDER_IDS] = NotifiedOutdatedOrderIds;
             Settings[CUSTOM_ITEMS] = CustomItems;
             Settings[WATCHLIST_PRICE_ALERTS] = WatchlistPriceAlerts;
@@ -157,6 +161,7 @@ namespace Settings
     bool ShowOutdatedOrders = true;
     bool HideNotificationsInCombat = true;
     bool RaidBossesOnly = false;
+    bool ShowCollectionPriceSilverCopper = false;
     std::set<int> NotifiedOutdatedOrderIds;
     std::vector<CustomItem> CustomItems;
     std::vector<WatchlistPriceAlert> WatchlistPriceAlerts;
